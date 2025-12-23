@@ -11,7 +11,7 @@ DISCORD_WEBHOOK_GESTAO = "https://discord.com/api/webhooks/1452088104616722475/m
 
 # --- CONFIGURAÇÃO SUPABASE ---
 SUPABASE_URL = "https://gzozaxrigjzjrqfvdxzw.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6b3pxeHJsZ2R6anJxZnZkeHp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0OTg1MjIsImV4cCI6MjA4MjA3NDUyMn0.dLEjBPESUz5KnVwxqEMaMxoy65gsLqG2QdjK2xFTUhU"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6b3pheHJpZ2p6anJxZnZkeHp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ0OTg1MjIsImV4cCI6MjA1MDA3NDUyMn0.dLEjBPESUz5KnVwxqEMaMxoy65gsLqG2QdjK2xFTUhU"
 
 TIMEZONE_SP = pytz.timezone('America/Sao_Paulo')
 
@@ -80,8 +80,12 @@ st.markdown("""
 @st.cache_resource
 def conectar_supabase():
     try:
-        return create_client(SUPABASE_URL, SUPABASE_KEY)
-    except:
+        client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        # Testa a conexão fazendo uma query simples
+        client.table('usuarios').select('id').limit(1).execute()
+        return client
+    except Exception as e:
+        st.error(f"❌ Erro ao conectar com o Supabase: {e}")
         return None
 
 supabase: Client = conectar_supabase()
@@ -96,29 +100,34 @@ if supabase:
     if 'pausa_ativa' not in st.session_state:
         st.session_state.pausa_ativa = False
 
-    # Carregar usuários
-    usuarios_response = supabase.table('usuarios').select('*').execute()
-    usuarios_db = {u['email'].lower(): u for u in usuarios_response.data}
-
     if not st.session_state.logado:
+        # TELA DE LOGIN
         st.markdown("### 🔐 Login")
         u_log = st.text_input("E-mail").strip().lower()
         p_log = st.text_input("Senha", type="password")
         
         if st.button("ACESSAR SISTEMA"):
-            if u_log in usuarios_db and usuarios_db[u_log]['senha'] == p_log:
-                st.session_state.logado = True
-                st.session_state.user_atual = u_log
+            try:
+                # Carrega usuários apenas na hora do login
+                usuarios_response = supabase.table('usuarios').select('*').execute()
+                usuarios_db = {u['email'].lower(): u for u in usuarios_response.data}
                 
-                # Verifica primeiro acesso
-                if usuarios_db[u_log].get('primeiro_acesso', True):
-                    st.session_state.precisa_trocar_senha = True
+                if u_log in usuarios_db and usuarios_db[u_log]['senha'] == p_log:
+                    st.session_state.logado = True
+                    st.session_state.user_atual = u_log
+                    st.session_state.usuarios_db = usuarios_db
+                    
+                    # Verifica primeiro acesso
+                    if usuarios_db[u_log].get('primeiro_acesso', True):
+                        st.session_state.precisa_trocar_senha = True
+                    else:
+                        st.session_state.precisa_trocar_senha = False
+                    
+                    st.rerun()
                 else:
-                    st.session_state.precisa_trocar_senha = False
-                
-                st.rerun()
-            else:
-                st.error("Login ou senha incorretos.")
+                    st.error("❌ Login ou senha incorretos.")
+            except Exception as e:
+                st.error(f"❌ Erro ao validar login: {e}")
     
     elif st.session_state.get('precisa_trocar_senha', False):
         # TELA DE TROCA DE SENHA
@@ -161,6 +170,18 @@ if supabase:
     
     else:
         # SISTEMA PRINCIPAL
+        usuarios_db = st.session_state.get('usuarios_db', {})
+        
+        # Se não tiver usuários no session_state, recarrega
+        if not usuarios_db:
+            try:
+                usuarios_response = supabase.table('usuarios').select('*').execute()
+                usuarios_db = {u['email'].lower(): u for u in usuarios_response.data}
+                st.session_state.usuarios_db = usuarios_db
+            except Exception as e:
+                st.error(f"❌ Erro ao carregar usuários: {e}")
+                st.stop()
+        
         u_info = usuarios_db.get(st.session_state.user_atual, {})
         cargo = str(u_info.get('tipo', '')).lower()
         
@@ -198,7 +219,7 @@ if supabase:
                                      f"🔔 **{usuarios_db[alvo]['nome']}**, sua pausa foi liberada!")
                         st.success("✅ Pausa liberada com sucesso!")
                     except Exception as e:
-                        st.error(f"Erro: {e}")
+                        st.error(f"❌ Erro ao autorizar pausa: {e}")
 
             elif menu == "Histórico":
                 st.subheader("📊 Histórico de Pausas")
@@ -212,7 +233,7 @@ if supabase:
                     else:
                         st.info("Nenhum histórico encontrado.")
                 except Exception as e:
-                    st.error(f"Erro ao carregar histórico: {e}")
+                    st.error(f"❌ Erro ao carregar histórico: {e}")
 
             elif menu == "Gestão de Equipe":
                 st.subheader("👥 Gerenciamento de Usuários")
@@ -241,7 +262,7 @@ if supabase:
                                 st.cache_resource.clear()
                                 st.rerun()
                             except Exception as e:
-                                st.error(f"Erro: {e}")
+                                st.error(f"❌ Erro ao criar usuário: {e}")
                 
                 with t2:
                     remover = st.selectbox("Escolha para remover:", list(usuarios_db.keys()))
@@ -249,11 +270,11 @@ if supabase:
                         try:
                             user_id = usuarios_db[remover]['id']
                             supabase.table('usuarios').delete().eq('id', user_id).execute()
-                            st.success("Usuário removido!")
+                            st.success("✅ Usuário removido!")
                             st.cache_resource.clear()
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Erro ao remover: {e}")
+                            st.error(f"❌ Erro ao remover: {e}")
 
         # ATENDENTE
         else:
@@ -276,7 +297,7 @@ if supabase:
                         else:
                             st.info("⏳ Aguardando autorização do supervisor...")
                     except Exception as e:
-                        st.error(f"Erro: {e}")
+                        st.error(f"❌ Erro ao verificar liberação: {e}")
                 
                 if st.session_state.get('pausa_liberada'):
                     if st.button(f"🚀 INICIAR {st.session_state.tempo_pausa} MINUTOS"):
@@ -294,7 +315,7 @@ if supabase:
                                          f"🚀 **{u_info['nome']}** INICIOU a pausa.")
                             st.rerun()
                         except Exception as e:
-                            st.error(f"Erro: {e}")
+                            st.error(f"❌ Erro ao iniciar pausa: {e}")
             
             else:
                 # CRONÔMETRO
@@ -348,8 +369,9 @@ if supabase:
                         st.session_state.pausa_liberada = False
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Erro: {e}")
+                        st.error(f"❌ Erro ao finalizar pausa: {e}")
 
 else:
     st.error("❌ Erro ao conectar com o banco de dados.")
-    st.info("Verifique se SUPABASE_URL e SUPABASE_KEY estão corretos.")
+    st.info("🔧 Verifique se as credenciais do Supabase estão corretas e se o serviço está disponível.")
+    st.info("📝 Detalhes técnicos: Não foi possível estabelecer conexão com o Supabase.")
