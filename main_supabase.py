@@ -27,16 +27,13 @@ def enviar_discord(webhook_url, mensagem):
     try: requests.post(webhook_url, json={"content": mensagem}, timeout=5)
     except: pass
 
-# --- FUNÇÃO DE E-MAIL COM MODELO COMPLETO ---
 def enviar_email_boas_vindas(nome, email_destino, senha_temp):
     try:
         msg = MIMEMultipart()
         msg['From'] = f"Gestão de Pausas QP <{GMAIL_USER}>"
         msg['To'] = email_destino
         msg['Subject'] = "🎉 Bem-vindo ao Sistema de Gestão de Pausas - Quero Passagem"
-
         corpo = f"""Olá {nome},
-
 Você foi cadastrado no Sistema de Gestão de Pausas da Quero Passagem!
 
 🔐 SEUS DADOS DE ACESSO:
@@ -48,26 +45,14 @@ Senha Temporária: {senha_temp}
 
 ⚠️ IMPORTANTE: No primeiro acesso, você será solicitado a criar uma nova senha (mínimo 6 caracteres).
 
-📋 COMO FUNCIONA O SISTEMA:
-1️⃣ SOLICITAR PAUSA: Faça login e clique em "VERIFICAR MINHA LIBERAÇÃO".
-2️⃣ INICIAR PAUSA: Quando autorizado, clique em "INICIAR". O cronômetro começará.
-3️⃣ ALERTA: O sistema emitirá um ALARME SONORO ao finalizar o tempo.
-4️⃣ FINALIZAR: BATA O PONTO NO VR antes de clicar em "FINALIZAR" no sistema.
-
-💡 DICA: Mantenha a aba do navegador aberta para ouvir o alarme.
-
 Atenciosamente,
 Gestão de Pausas - Quero Passagem"""
-
         msg.attach(MIMEText(corpo, 'plain'))
         server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(GMAIL_USER, GMAIL_PASSWORD)
-        server.send_message(msg)
-        server.quit()
+        server.starttls(); server.login(GMAIL_USER, GMAIL_PASSWORD)
+        server.send_message(msg); server.quit()
         return True
-    except:
-        return False
+    except: return False
 
 def gerar_csv(df):
     return df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
@@ -121,7 +106,7 @@ if supabase:
                 alvo = st.selectbox("Atendente SAC:", at)
                 minutos = st.number_input("Duração (minutos):", 1, 120, 15)
                 if st.button("AUTORIZAR PAUSA"):
-                    supabase.table('escalas').insert({'email':alvo,'nome':usuarios_db[alvo]['nome'],'duracao':minutos,'status':'Pendente'}).execute()
+                    supabase.table('escalas').insert({'email':alvo,'nome':usuarios_db[alvo]['nome'],'duracao':minutos,'status':'Pendente','inicio':get_now().isoformat()}).execute()
                     enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🔔 {usuarios_db[alvo]['nome']}, sua pausa foi liberada!")
                     st.success("✅ Liberado!")
 
@@ -139,7 +124,7 @@ if supabase:
                 tab_add, tab_del = st.tabs(["➕ Adicionar", "🗑️ Excluir"])
                 with tab_add:
                     with st.form("add_user", clear_on_submit=True):
-                        n = st.text_input("Nome"); e = st.text_input("Email").lower(); s = st.text_input("Senha Temp")
+                        n, e, s = st.text_input("Nome"), st.text_input("Email").lower(), st.text_input("Senha Temp")
                         t = st.selectbox("Perfil", ["atendente sac", "supervisor", "administrador"])
                         if st.form_submit_button("SALVAR"):
                             supabase.table('usuarios').insert({'nome':n,'email':e,'senha':s,'tipo':t,'primeiro_acesso':True}).execute()
@@ -163,18 +148,54 @@ if supabase:
                         st.success("✅ Resetado!"); st.rerun()
                 else: st.write("Ninguém travado.")
 
-        else: # ATENDENTE
+        else: # --- LÓGICA DO ATENDENTE (COM RECUPERAÇÃO DE QUEDA) ---
             st.subheader("⏱️ Minha Pausa")
-            if 'pausa_ativa' not in st.session_state or not st.session_state.pausa_ativa:
+            
+            # Recuperação automática se o site travar/atualizar
+            res_recupera = supabase.table('escalas').select('*').eq('email', st.session_state.user_atual).eq('status', 'Em Pausa').execute()
+            
+            if res_recupera.data and 'pausa_ativa' not in st.session_state:
+                pausa_salva = res_recupera.data[0]
+                inicio_dt = datetime.fromisoformat(pausa_salva['inicio'].replace('Z', '+00:00')).astimezone(TIMEZONE_SP)
+                fim_dt = inicio_dt + timedelta(minutes=pausa_salva['duracao'])
+                
+                if get_now() < fim_dt:
+                    st.session_state.update({
+                        "pausa_ativa": True, 
+                        "p_id": pausa_salva['id'], 
+                        "t_pausa": pausa_salva['duracao'],
+                        "fim": fim_dt.timestamp() * 1000,
+                        "saida": inicio_dt.strftime("%H:%M:%S")
+                    })
+                    st.warning("⚠️ Sua pausa foi recuperada após uma queda de conexão!")
+                else:
+                    st.error("🚨 Seu tempo de pausa expirou durante a queda de conexão. Finalize agora!")
+                    st.session_state.update({
+                        "pausa_ativa": True, "p_id": pausa_salva['id'], "t_pausa": pausa_salva['duracao'],
+                        "fim": get_now().timestamp() * 1000, "saida": inicio_dt.strftime("%H:%M:%S")
+                    })
+
+            if not st.session_state.get('pausa_ativa'):
                 if st.button("🔄 VERIFICAR MINHA LIBERAÇÃO"):
                     res = supabase.table('escalas').select('*').eq('email', st.session_state.user_atual).eq('status', 'Pendente').execute()
                     if res.data:
                         st.session_state.update({"t_pausa": res.data[0]['duracao'], "p_id": res.data[0]['id'], "liberado": True})
                         st.success(f"✅ Autorizado: {st.session_state.t_pausa} min!"); st.balloons()
                     else: st.info("⏳ Aguardando liberação...")
+                
                 if st.session_state.get('liberado') and st.button("🚀 INICIAR"):
-                    supabase.table('escalas').update({'status': 'Em Pausa'}).eq('id', st.session_state.p_id).execute()
-                    st.session_state.update({"pausa_ativa": True, "fim": (get_now() + timedelta(minutes=st.session_state.t_pausa)).timestamp() * 1000, "saida": get_now().strftime("%H:%M:%S")})
+                    # Registramos o 'inicio' exato no banco para poder recuperar depois
+                    hora_inicio = get_now()
+                    supabase.table('escalas').update({
+                        'status': 'Em Pausa', 
+                        'inicio': hora_inicio.isoformat()
+                    }).eq('id', st.session_state.p_id).execute()
+                    
+                    st.session_state.update({
+                        "pausa_ativa": True, 
+                        "fim": (hora_inicio + timedelta(minutes=st.session_state.t_pausa)).timestamp() * 1000, 
+                        "saida": hora_inicio.strftime("%H:%M:%S")
+                    })
                     enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🚀 **{u_info['nome']}** iniciou."); st.rerun()
             else:
                 st.components.v1.html(f"""
