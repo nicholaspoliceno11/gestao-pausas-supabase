@@ -1,6 +1,14 @@
-[server]
-enableCORS = false
-enableXsrfProtection = false
+[theme]
+primaryColor = "#004a99"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+font = "sans serif"
 
-[runner]
-magicEnabled = false
+[server]
+headless = true
+enableCORS = false
+enableXsrfProtection = true
+
+[browser]
+gatherUsageStats = false
