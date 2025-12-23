@@ -138,14 +138,42 @@ header, footer, .stDeployButton, #MainMenu {
     max-width: 1200px !important;
 }
 
-/* Seções com card design */
-div[data-testid="stVerticalBlock"] > div:has(> div[data-testid="stMarkdown"]) {
+/* Remover bordas brancas vazias - aplicar apenas em divs com conteúdo */
+div[data-testid="stVerticalBlock"] {
+    gap: 0 !important;
+}
+
+/* Card bonito apenas para seções principais */
+section[data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlock"] {
     background-color: white !important;
-    padding: 25px !important;
+    padding: 30px !important;
     border-radius: 12px !important;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
     border: 1px solid #e5e7eb !important;
     margin-bottom: 20px !important;
+}
+
+/* Remover padding extra de containers vazios */
+div[data-testid="stVerticalBlock"]:empty {
+    display: none !important;
+}
+
+/* Header do usuário na sidebar */
+[data-testid="stSidebar"] h2 {
+    background-color: rgba(255,255,255,0.1) !important;
+    padding: 15px !important;
+    border-radius: 8px !important;
+    margin: 10px 0 !important;
+    text-align: center !important;
+}
+
+/* Melhorar visual das tabs */
+.stTabs {
+    background-color: white !important;
+    padding: 20px !important;
+    border-radius: 12px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+    border: 1px solid #e5e7eb !important;
 }
 
 /* INPUTS DE TEXTO */
@@ -265,23 +293,54 @@ input[type="number"] {
 }
 
 /* RADIO BUTTONS */
-.stRadio > div {
+.stRadio {
     background-color: white !important;
-    padding: 12px !important;
-    border-radius: 8px !important;
+    padding: 20px !important;
+    border-radius: 12px !important;
     border: 1px solid #e5e7eb !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+
+.stRadio > div {
+    gap: 8px !important;
 }
 
 .stRadio label {
     color: #262730 !important;
     font-weight: 500 !important;
-    padding: 8px 12px !important;
-    border-radius: 6px !important;
+    padding: 12px 20px !important;
+    border-radius: 8px !important;
     transition: all 0.2s ease !important;
+    border: 2px solid transparent !important;
 }
 
 .stRadio label:hover {
     background-color: #f3f4f6 !important;
+    border-color: #e5e7eb !important;
+}
+
+.stRadio input[type="radio"]:checked + label {
+    background-color: #eff6ff !important;
+    border-color: #004a99 !important;
+    color: #004a99 !important;
+    font-weight: 600 !important;
+}
+
+/* Títulos de seção */
+h1, h2, h3 {
+    padding: 15px 0 10px 0 !important;
+    border-bottom: 3px solid #004a99 !important;
+    margin-bottom: 20px !important;
+}
+
+h2 {
+    font-size: 24px !important;
+    color: #004a99 !important;
+}
+
+h3 {
+    font-size: 20px !important;
+    border-bottom: 2px solid #e5e7eb !important;
 }
 
 /* DATAFRAMES */
@@ -519,7 +578,9 @@ if supabase:
             st.divider()
 
             if menu == "Liberar Pausa":
-                st.subheader("🚀 Liberar Pausa para Atendente")
+                st.markdown("### 🚀 Liberar Pausa para Atendente")
+                st.divider()
+                
                 at = [e for e, i in usuarios_db.items() if 'atendente' in i['tipo'].lower()]
                 
                 if not at:
@@ -542,7 +603,9 @@ if supabase:
                             st.error("❌ Erro ao liberar pausa. Tente novamente.")
 
             elif menu == "Histórico":
-                st.subheader("📊 Histórico de Pausas")
+                st.markdown("### 📊 Histórico de Pausas")
+                st.divider()
+                
                 try:
                     h_resp = supabase.table('historico').select('*').order('created_at', desc=True).execute()
                     if h_resp.data and len(h_resp.data) > 0:
@@ -567,7 +630,9 @@ if supabase:
                     st.error("❌ Erro ao carregar histórico. Tente novamente.")
 
             elif menu == "Gestão de Equipe":
-                st.subheader("👥 Gerenciamento de Equipe")
+                st.markdown("### 👥 Gerenciamento de Equipe")
+                st.divider()
+                
                 tab_add, tab_del = st.tabs(["➕ Adicionar Usuário", "🗑️ Remover Usuário"])
                 
                 with tab_add:
@@ -636,11 +701,15 @@ if supabase:
                                 st.error("❌ Você precisa digitar 'CONFIRMAR' para prosseguir!")
 
             elif menu == "Correções":
-                st.subheader("⚠️ Destravar Funcionário")
+                st.markdown("### ⚠️ Destravar Funcionário")
+                st.divider()
+                
                 st.markdown("""
-                Esta funcionalidade permite destravar funcionários que ficaram com pausas ativas no sistema 
-                (geralmente por problemas técnicos ou fechamento acidental da página).
-                """)
+                <div style="background-color: #fffbeb; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 20px;">
+                    <p style="margin: 0; color: #92400e;"><strong>ℹ️ Sobre esta funcionalidade:</strong></p>
+                    <p style="margin: 5px 0 0 0; color: #92400e;">Esta ferramenta permite destravar funcionários que ficaram com pausas ativas no sistema devido a problemas técnicos ou fechamento acidental da página.</p>
+                </div>
+                """, unsafe_allow_html=True)
                 
                 try:
                     esc = supabase.table('escalas').select('*').execute()
@@ -695,7 +764,8 @@ if supabase:
                     st.write("Por favor, tente novamente. Se o erro persistir, contate o suporte técnico.")
 
         else: # ATENDENTE
-            st.subheader("⏱️ Minha Pausa")
+            st.markdown("### ⏱️ Minha Pausa")
+            st.divider()
             
             if 'pausa_ativa' not in st.session_state or not st.session_state.pausa_ativa:
                 col1, col2 = st.columns([1, 1])
