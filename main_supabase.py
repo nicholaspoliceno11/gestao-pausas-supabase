@@ -32,7 +32,7 @@ def enviar_discord(webhook_url, mensagem):
 def gerar_csv(df):
     return df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
 
-# --- UI E ESTILO (TOTALMENTE REVISADO) ---
+# --- UI E ESTILO REFINADO ---
 st.set_page_config(page_title="Gestão de Pausas - QP", layout="centered")
 
 st.markdown("""
@@ -43,36 +43,35 @@ st.markdown("""
     .logo-qp { font-family: 'Arial Black', sans-serif; font-size: 35pt; color: #004a99; text-align: center; margin-bottom: 5px; }
     .subtitulo-qp { font-size: 16pt; color: #666; text-align: center; margin-bottom: 30px; }
 
-    /* Estilo da Sidebar */
+    /* Sidebar Estilizada */
     [data-testid="stSidebar"] { background: linear-gradient(180deg, #004a99 0%, #003366 100%) !important; }
     [data-testid="stSidebar"] * { color: white !important; }
     
     /* Botão Sair na Sidebar */
     [data-testid="stSidebar"] .stButton > button {
-        background-color: rgba(255, 255, 255, 0.25) !important;
+        background-color: rgba(255, 255, 255, 0.2) !important;
         color: white !important;
-        border: 1px solid rgba(255, 255, 255, 0.5) !important;
+        border: 1px solid white !important;
         width: 100% !important;
         height: 45px !important;
         font-weight: bold !important;
     }
 
-    /* Correção de visibilidade para Selectbox (E-mail e Perfil) */
+    /* Correção visual Selectbox (Texto visível após seleção) */
     div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
         color: #262730 !important;
         -webkit-text-fill-color: #262730 !important;
         background-color: white !important;
     }
     
-    /* Garantir texto preto no Dropdown */
     [data-baseweb="popover"] li { color: #262730 !important; }
 
-    /* Texto no Histórico / Tabelas */
+    /* Texto do Histórico/Tabelas */
     [data-testid="stDataFrame"] div, [data-testid="stDataFrame"] span {
         color: #262730 !important;
     }
 
-    /* Botão Primário Azul Quero Passagem */
+    /* Botão Primário Azul */
     .stButton > button[kind="primary"] {
         background-color: #004a99 !important;
         color: white !important;
@@ -99,7 +98,6 @@ if supabase:
         st.error("❌ Erro ao carregar banco de dados.")
         st.stop()
 
-    # --- TELA DE LOGIN ---
     if not st.session_state.logado:
         st.markdown("### 🔐 Login")
         u_input = st.text_input("E-mail").strip().lower()
@@ -119,14 +117,12 @@ if supabase:
                 supabase.table('usuarios').update({'senha': nova, 'primeiro_acesso': False}).eq('email', st.session_state.user_atual).execute()
                 st.session_state.precisa_trocar = False
                 st.rerun()
-            else: st.error("❌ Verifique os campos (mín. 6 caracteres).")
+            else: st.error("❌ Erro: Verifique os campos.")
 
     else:
-        # --- SISTEMA LOGADO ---
         u_info = usuarios_db.get(st.session_state.user_atual, {})
         cargo = str(u_info.get('tipo', '')).lower()
         
-        # Barra Lateral
         st.sidebar.write(f"## 👤 {u_info.get('nome')}")
         if st.sidebar.button("Sair"): 
             st.session_state.clear()
@@ -139,10 +135,10 @@ if supabase:
             if menu == "Liberar Pausa":
                 st.markdown("### 🚀 Liberar Pausa para Atendente")
                 at = [e for e, i in usuarios_db.items() if 'atendente' in i['tipo'].lower()]
-                if not at: st.warning("⚠️ Não há atendentes cadastrados.")
+                if not at: st.warning("⚠️ Não há atendentes.")
                 else:
                     alvo = st.selectbox("Selecione o Atendente SAC:", at)
-                    minutos = st.number_input("Duração (Minutos):", 1, 120, 15)
+                    minutos = st.number_input("Duração:", 1, 120, 15)
                     if st.button("✅ AUTORIZAR PAUSA", type="primary"):
                         supabase.table('escalas').insert({'email': alvo, 'nome': usuarios_db[alvo]['nome'], 'duracao': minutos, 'status': 'Pendente'}).execute()
                         enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🔔 {usuarios_db[alvo]['nome']}, sua pausa foi liberada!")
@@ -155,8 +151,7 @@ if supabase:
                     if h_resp.data:
                         df = pd.DataFrame(h_resp.data)
                         st.dataframe(df[['nome', 'data', 'h_saida', 'h_retorno', 'duracao']], use_container_width=True)
-                        st.download_button("📥 Baixar CSV", data=gerar_csv(df), file_name="historico_pausas.csv", mime="text/csv")
-                    else: st.info("Sem registros no histórico.")
+                        st.download_button("📥 Baixar CSV", data=gerar_csv(df), file_name="historico.csv", mime="text/csv")
                 except: st.error("Erro ao carregar histórico.")
 
             elif menu == "Gestão de Equipe":
@@ -164,13 +159,28 @@ if supabase:
                 with tab_add:
                     with st.form("add_user"):
                         n = st.text_input("Nome Completo*")
-                        e = st.text_input("E-mail*").lower()
+                        e = st.text_input("E-mail*").lower().strip()
                         s = st.text_input("Senha Temporária*")
-                        t = st.selectbox("Perfil*", ["atendente sac", "supervisor", "administrador"])
+                        t = st.selectbox("Perfil de Acesso*", ["atendente sac", "supervisor", "administrador"])
                         if st.form_submit_button("💾 CADASTRAR"):
                             supabase.table('usuarios').insert({'nome': n, 'email': e, 'senha': s, 'tipo': t, 'primeiro_acesso': True}).execute()
-                            st.success("Usuário cadastrado!")
+                            st.success("✅ Usuário cadastrado!")
                             st.rerun()
+                
+                with tab_del:
+                    st.markdown("#### Remover Usuário do Sistema")
+                    lista_remover = [f"{u['nome']} ({u['email']})" for u in usuarios_resp.data if u['email'] != st.session_state.user_atual]
+                    if lista_remover:
+                        alvo_remover = st.selectbox("Selecione quem remover:", lista_remover)
+                        email_final = alvo_remover.split('(')[-1].replace(')', '')
+                        cod_del = st.text_input("Código Mestre para Confirmar Exclusão:", type="password", key="del_secure")
+                        if st.button("🗑️ EXCLUIR DEFINITIVAMENTE", type="primary"):
+                            if cod_del == CODIGO_MESTRE_GESTAO:
+                                supabase.table('usuarios').delete().eq('email', email_final).execute()
+                                st.success(f"✅ {email_final} removido.")
+                                st.rerun()
+                            else: st.error("❌ Código Mestre incorreto.")
+                    else: st.info("Não há outros usuários.")
 
             elif menu == "Correções":
                 st.markdown("### ⚠️ Destravar Funcionário")
@@ -178,19 +188,14 @@ if supabase:
                 if esc.data:
                     opcoes = [f"{x['nome']} ({x['email']})" for x in esc.data]
                     sel = st.selectbox("Selecione para destravar:", opcoes)
-                    cod = st.text_input("Código Mestre:", type="password")
+                    cod = st.text_input("Código Mestre:", type="password", key="unlock_secure")
                     if st.button("🔓 DESTRAVAR", type="primary"):
                         if cod == CODIGO_MESTRE_GESTAO:
                             idx = opcoes.index(sel)
                             supabase.table('escalas').delete().eq('id', esc.data[idx]['id']).execute()
                             st.success("✅ Destravado!")
                             st.rerun()
-                        else: st.error("❌ Código incorreto.")
-                else: st.success("✅ Tudo normal.")
+                        else: st.error("❌ Código Mestre incorreto.")
+                else: st.success("✅ Nenhuma pausa travada.")
 
-        else: # TELA DO ATENDENTE (CRONÔMETRO)
-            st.markdown("### ⏱️ Minha Pausa")
-            st.info("Sua interface de pausa aparecerá aqui assim que for liberada pela gestão.")
-            # ... Restante da lógica de pausa do atendente ...
-
-else: st.error("❌ Erro de conexão com o banco de dados.")
+else: st.error("❌ Erro de conexão.")
