@@ -39,7 +39,7 @@ st.markdown("""
     body, .stApp { background-color: #f5f7fa !important; color: #262730 !important; }
     .logo-qp { font-family: 'Arial Black', sans-serif; font-size: 35pt; color: #004a99; text-align: center; margin-bottom: 5px; }
     .subtitulo-qp { font-size: 16pt; color: #666; text-align: center; margin-bottom: 30px; }
-    
+
     /* Sidebar */
     [data-testid="stSidebar"] { background: linear-gradient(180deg, #004a99 0%, #003366 100%) !important; }
     [data-testid="stSidebar"] * { color: white !important; }
@@ -62,7 +62,7 @@ st.markdown("""
 
     /* Tables */
     [data-testid="stDataFrame"] div, [data-testid="stDataFrame"] span { color: #262730 !important; }
-    
+
     /* Primary Buttons */
     .stButton > button[kind="primary"] { background-color: #004a99 !important; color: white !important; }
 </style>
@@ -77,7 +77,7 @@ supabase = conectar_supabase()
 
 if supabase:
     st.markdown('<div class="logo-qp">Quero Passagem</div><div class="subtitulo-qp">Gestão de Pausa</div>', unsafe_allow_html=True)
-    
+
     if 'logado' not in st.session_state: st.session_state.logado = False
 
     try:
@@ -96,7 +96,7 @@ if supabase:
                 st.session_state.update({"logado": True, "user_atual": u_input, "precisa_trocar": usuarios_db[u_input].get('primeiro_acesso', True)})
                 st.rerun()
             else: st.error("❌ Credenciais incorretas.")
-    
+
     elif st.session_state.get('precisa_trocar'):
         st.markdown("### 🔑 Criar Nova Senha")
         nova = st.text_input("Nova Senha", type="password")
@@ -185,7 +185,7 @@ if supabase:
                         st.session_state.update({"t_pausa": res.data[0]['duracao'], "p_id": res.data[0]['id'], "liberado": True})
                         st.success(f"✅ Pausa autorizada: {st.session_state.t_pausa} minutos!")
                     else: st.info("⏳ Aguardando liberação da gestão...")
-                
+
                 if st.session_state.get('liberado'):
                     if st.button("🚀 INICIAR PAUSA AGORA", use_container_width=True):
                         supabase.table('escalas').update({'status': 'Em Pausa'}).eq('id', st.session_state.p_id).execute()
@@ -197,20 +197,35 @@ if supabase:
                     <div id="timer" style="font-size: 80px; font-weight: bold; text-align: center; color: #ff4b4b; padding: 20px; border: 4px solid #ff4b4b; border-radius: 15px; font-family: sans-serif;">--:--</div>
                     <script>
                         var endTime = {st.session_state.fim};
-                        function tocarAlerta() {{
-                            var context = new (window.AudioContext || window.webkitAudioContext)();
-                            function beep(delay) {{
-                                setTimeout(() => {{
-                                    var osc = context.createOscillator(); var gain = context.createGain();
-                                    osc.connect(gain); gain.connect(context.destination);
-                                    osc.type = "sine"; osc.frequency.value = 880;
-                                    gain.gain.setValueAtTime(0.5, context.currentTime);
-                                    gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.5);
-                                    osc.start(); osc.stop(context.currentTime + 0.5);
-                                }}, delay);
-                            }}
-                            beep(0); beep(600);
+                        var audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        var beepCount = 0;
+                        var maxBeeps = 3; // Número de bips desejados
+                        var beepInterval = 500; // Intervalo entre os bips em ms
+
+                        function playBeep() {{
+                            var osc = audioContext.createOscillator();
+                            var gain = audioContext.createGain();
+                            osc.connect(gain);
+                            gain.connect(audioContext.destination);
+                            osc.type = "sine";
+                            osc.frequency.value = 880; // Frequência do bip
+                            gain.gain.setValueAtTime(0.8, audioContext.currentTime); // Aumenta o volume
+                            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4); // Duração do bip
+                            osc.start();
+                            osc.stop(audioContext.currentTime + 0.4);
                         }}
+
+                        function startBeeping() {{
+                            beepCount = 0;
+                            var beepTimer = setInterval(function() {{
+                                playBeep();
+                                beepCount++;
+                                if (beepCount >= maxBeeps) {{
+                                    clearInterval(beepTimer);
+                                }}
+                            }}, beepInterval);
+                        }}
+
                         var x = setInterval(function() {{
                             var diff = endTime - new Date().getTime();
                             if (diff <= 0) {{
@@ -218,10 +233,13 @@ if supabase:
                                 document.getElementById('timer').innerHTML = "00:00";
                                 document.getElementById('timer').style.backgroundColor = "#ff4b4b";
                                 document.getElementById('timer').style.color = "white";
-                                tocarAlerta();
-                                alert("🚨 ATENÇÃO!\\n\\nSua pausa finalizou, abra seu VR e bata o ponto e depois finalize aqui no site gestão de pausas");
+                                startBeeping(); // Inicia os bips múltiplos
+
+                                // Mensagem de alerta mais chamativa
+                                alert("🚨 ATENÇÃO! 🚨\\n\\nSua pausa finalizou!\\nPRIMEIRO: Bata o ponto principal no VR.\\nDEPOIS: Finalize sua pausa aqui no sistema.");
                             }} else {{
-                                var m = Math.floor(diff / 60000); var s = Math.floor((diff % 60000) / 1000);
+                                var m = Math.floor(diff / 60000);
+                                var s = Math.floor((diff % 60000) / 1000);
                                 document.getElementById('timer').innerHTML = (m<10?"0":"")+m+":"+(s<10?"0":"")+s;
                             }}
                         }}, 1000);
