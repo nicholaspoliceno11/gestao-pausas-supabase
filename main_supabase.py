@@ -1,9 +1,10 @@
 import streamlit as st
 from supabase import create_client, Client
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import pandas as pd
 import pytz
 import requests
+import io
 
 # --- CONFIGURAÇÃO DISCORD ---
 DISCORD_WEBHOOK_EQUIPE = "https://discord.com/api/webhooks/1452314030357348353/-ty01Mp6tabaM4U9eICtKHJiitsNUoEa9CFs04ivKmvg2FjEBRQ8CSjPJtSD91ZkrvUi"
@@ -23,6 +24,29 @@ def enviar_discord(webhook_url, mensagem):
         requests.post(webhook_url, json={"content": mensagem}, timeout=5)
     except:
         pass
+
+# --- FUNÇÕES DE RELATÓRIO ---
+def gerar_relatorio_csv(df, nome_arquivo="relatorio"):
+    """Gera CSV para download"""
+    csv = df.to_csv(index=False, encoding='utf-8-sig')
+    return csv
+
+def gerar_relatorio_excel(df, nome_arquivo="relatorio"):
+    """Gera Excel para download"""
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Relatório')
+    return output.getvalue()
+
+def formatar_dataframe_relatorio(df):
+    """Formata o DataFrame para exibição"""
+    if not df.empty:
+        # Formata datas
+        if 'data' in df.columns:
+            df['data'] = pd.to_datetime(df['data']).dt.strftime('%d/%m/%Y')
+        if 'created_at' in df.columns:
+            df['created_at'] = pd.to_datetime(df['created_at']).dt.strftime('%d/%m/%Y %H:%M')
+    return df
 
 # --- CONFIGURAÇÃO VISUAL ---
 st.set_page_config(page_title="Gestão de Pausas - QP", layout="centered")
@@ -72,6 +96,12 @@ st.markdown("""
         font-size: 16pt; 
         color: #666 !important; 
         text-align: center; 
+    }
+    .metric-card {
+        background-color: #f0f2f6;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -193,7 +223,7 @@ if supabase:
 
         # ADMIN/SUPERVISOR
         if any(x in cargo for x in ['admin', 'supervisor', 'gestão']):
-            menu = st.radio("Ações:", ["Liberar Pausa", "Histórico", "Gestão de Equipe"], 
+            menu = st.radio("Ações:", ["Liberar Pausa", "Histórico", "Relatórios", "Gestão de Equipe"], 
                           horizontal=True, label_visibility="collapsed")
             st.divider()
             
@@ -202,38 +232,176 @@ if supabase:
                 atendentes = [email for email, info in usuarios_db.items() 
                             if 'atendente' in info.get('tipo', '').lower()]
                 
-                alvo = st.selectbox("Atendente SAC:", atendentes)
-                tempo_alvo = st.number_input("Duração (minutos):", 1, 120, 15)
-                
-                if st.button("AUTORIZAR PAUSA"):
-                    try:
-                        supabase.table('escalas').insert({
-                            'email': alvo,
-                            'nome': usuarios_db[alvo]['nome'],
-                            'duracao': tempo_alvo,
-                            'status': 'Pendente',
-                            'inicio': get_now().isoformat()
-                        }).execute()
-                        
-                        enviar_discord(DISCORD_WEBHOOK_EQUIPE, 
-                                     f"🔔 **{usuarios_db[alvo]['nome']}**, sua pausa foi liberada!")
-                        st.success("✅ Pausa liberada com sucesso!")
-                    except Exception as e:
-                        st.error(f"❌ Erro ao autorizar pausa: {e}")
+                if not atendentes:
+                    st.warning("⚠️ Nenhum atendente cadastrado no sistema.")
+                else:
+                    alvo = st.selectbox("Atendente SAC:", atendentes)
+                    tempo_alvo = st.number_input("Duração (minutos):", 1, 120, 15)
+                    
+                    if st.button("AUTORIZAR PAUSA"):
+                        try:
+                            supabase.table('escalas').insert({
+                                'email': alvo,
+                                'nome': usuarios_db[alvo]['nome'],
+                                'duracao': tempo_alvo,
+                                'status': 'Pendente',
+                                'inicio': get_now().isoformat()
+                            }).execute()
+                            
+                            enviar_discord(DISCORD_WEBHOOK_EQUIPE, 
+                                         f"🔔 **{usuarios_db[alvo]['nome']}**, sua pausa foi liberada!")
+                            st.success("✅ Pausa liberada com sucesso!")
+                        except Exception as e:
+                            st.error(f"❌ Erro ao autorizar pausa: {e}")
 
             elif menu == "Histórico":
                 st.subheader("📊 Histórico de Pausas")
                 try:
-                    hist_response = supabase.table('historico').select('*').order('created_at', desc=True).limit(20).execute()
+                    hist_response = supabase.table('historico').select('*').order('created_at', desc=True).limit(50).execute()
                     df = pd.DataFrame(hist_response.data)
                     if not df.empty:
-                        df['data'] = pd.to_datetime(df['data']).dt.strftime('%d/%m/%Y')
+                        df = formatar_dataframe_relatorio(df)
                         st.dataframe(df[['nome', 'data', 'h_saida', 'h_retorno', 'duracao']], 
                                    use_container_width=True)
                     else:
                         st.info("Nenhum histórico encontrado.")
                 except Exception as e:
                     st.error(f"❌ Erro ao carregar histórico: {e}")
+
+            elif menu == "Relatórios":
+                st.subheader("📈 Relatórios e Exportação")
+                
+                # Filtros de período
+                col1, col2 = st.columns(2)
+                with col1:
+                    data_inicio = st.date_input("Data Início:", value=date.today() - timedelta(days=30))
+                with col2:
+                    data_fim = st.date_input("Data Fim:", value=date.today())
+                
+                # Tipo de relatório
+                tipo_relatorio = st.selectbox("Tipo de Relatório:", 
+                    ["Histórico de Pausas", "Pausas por Usuário", "Estatísticas Gerais"])
+                
+                if st.button("🔍 GERAR RELATÓRIO"):
+                    try:
+                        if tipo_relatorio == "Histórico de Pausas":
+                            # Busca histórico no período
+                            hist_response = supabase.table('historico').select('*')\
+                                .gte('data', data_inicio.isoformat())\
+                                .lte('data', data_fim.isoformat())\
+                                .order('data', desc=True).execute()
+                            
+                            df = pd.DataFrame(hist_response.data)
+                            
+                            if not df.empty:
+                                df = formatar_dataframe_relatorio(df)
+                                
+                                # Métricas
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric("Total de Pausas", len(df))
+                                with col2:
+                                    st.metric("Tempo Total (min)", df['duracao'].sum())
+                                with col3:
+                                    st.metric("Média por Pausa (min)", f"{df['duracao'].mean():.1f}")
+                                
+                                st.divider()
+                                
+                                # Tabela
+                                st.dataframe(df[['nome', 'data', 'h_saida', 'h_retorno', 'duracao']], 
+                                           use_container_width=True)
+                                
+                                # Botões de exportação
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    csv = gerar_relatorio_csv(df, "historico_pausas")
+                                    st.download_button(
+                                        label="📥 Baixar CSV",
+                                        data=csv,
+                                        file_name=f"historico_pausas_{data_inicio}_{data_fim}.csv",
+                                        mime="text/csv"
+                                    )
+                                with col2:
+                                    excel = gerar_relatorio_excel(df, "historico_pausas")
+                                    st.download_button(
+                                        label="📥 Baixar Excel",
+                                        data=excel,
+                                        file_name=f"historico_pausas_{data_inicio}_{data_fim}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                    )
+                            else:
+                                st.info("📭 Nenhum registro encontrado no período selecionado.")
+                        
+                        elif tipo_relatorio == "Pausas por Usuário":
+                            # Relatório agrupado por usuário
+                            hist_response = supabase.table('historico').select('*')\
+                                .gte('data', data_inicio.isoformat())\
+                                .lte('data', data_fim.isoformat()).execute()
+                            
+                            df = pd.DataFrame(hist_response.data)
+                            
+                            if not df.empty:
+                                resumo = df.groupby('nome').agg({
+                                    'duracao': ['count', 'sum', 'mean']
+                                }).reset_index()
+                                resumo.columns = ['Nome', 'Total de Pausas', 'Tempo Total (min)', 'Média (min)']
+                                resumo['Média (min)'] = resumo['Média (min)'].round(1)
+                                
+                                st.dataframe(resumo, use_container_width=True)
+                                
+                                # Botões de exportação
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    csv = gerar_relatorio_csv(resumo, "pausas_por_usuario")
+                                    st.download_button(
+                                        label="📥 Baixar CSV",
+                                        data=csv,
+                                        file_name=f"pausas_por_usuario_{data_inicio}_{data_fim}.csv",
+                                        mime="text/csv"
+                                    )
+                                with col2:
+                                    excel = gerar_relatorio_excel(resumo, "pausas_por_usuario")
+                                    st.download_button(
+                                        label="📥 Baixar Excel",
+                                        data=excel,
+                                        file_name=f"pausas_por_usuario_{data_inicio}_{data_fim}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                    )
+                            else:
+                                st.info("📭 Nenhum registro encontrado no período selecionado.")
+                        
+                        elif tipo_relatorio == "Estatísticas Gerais":
+                            # Dashboard com estatísticas
+                            hist_response = supabase.table('historico').select('*')\
+                                .gte('data', data_inicio.isoformat())\
+                                .lte('data', data_fim.isoformat()).execute()
+                            
+                            df = pd.DataFrame(hist_response.data)
+                            
+                            if not df.empty:
+                                col1, col2, col3, col4 = st.columns(4)
+                                with col1:
+                                    st.metric("Total de Pausas", len(df))
+                                with col2:
+                                    st.metric("Tempo Total", f"{df['duracao'].sum()} min")
+                                with col3:
+                                    st.metric("Média por Pausa", f"{df['duracao'].mean():.1f} min")
+                                with col4:
+                                    usuarios_unicos = df['nome'].nunique()
+                                    st.metric("Usuários Ativos", usuarios_unicos)
+                                
+                                st.divider()
+                                
+                                # Top 5 usuários
+                                st.markdown("### 🏆 Top 5 Usuários (Mais Pausas)")
+                                top_users = df.groupby('nome')['duracao'].count().sort_values(ascending=False).head(5)
+                                st.bar_chart(top_users)
+                                
+                            else:
+                                st.info("📭 Nenhum registro encontrado no período selecionado.")
+                                
+                    except Exception as e:
+                        st.error(f"❌ Erro ao gerar relatório: {e}")
 
             elif menu == "Gestão de Equipe":
                 st.subheader("👥 Gerenciamento de Usuários")
@@ -318,33 +486,90 @@ if supabase:
                             st.error(f"❌ Erro ao iniciar pausa: {e}")
             
             else:
-                # CRONÔMETRO
+                # CRONÔMETRO COM SOM DE ALERTA FORTE 3X
                 st.components.v1.html(f"""
                     <div id="timer" style="font-size: 80px; font-weight: bold; text-align: center; 
                          color: #ff4b4b; padding: 20px; border: 4px solid #ff4b4b; 
                          border-radius: 15px; background-color: #fffafa;">--:--</div>
+                    
                     <script>
                         var endTime = {st.session_state.h_termino_ms};
                         var timer = document.getElementById('timer');
+                        var alerted = false;
+                        
+                        // Cria o contexto de áudio
+                        var audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        
+                        // Função para tocar beep forte
+                        function playBeep() {{
+                            var oscillator = audioContext.createOscillator();
+                            var gainNode = audioContext.createGain();
+                            
+                            oscillator.connect(gainNode);
+                            gainNode.connect(audioContext.destination);
+                            
+                            oscillator.frequency.value = 800; // Frequência alta (Hz)
+                            oscillator.type = 'sine';
+                            
+                            gainNode.gain.setValueAtTime(1, audioContext.currentTime); // Volume máximo
+                            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                            
+                            oscillator.start(audioContext.currentTime);
+                            oscillator.stop(audioContext.currentTime + 0.5);
+                        }}
+                        
+                        // Função para tocar 3 beeps seguidos
+                        function playAlertSound() {{
+                            playBeep();
+                            setTimeout(function() {{ playBeep(); }}, 600);
+                            setTimeout(function() {{ playBeep(); }}, 1200);
+                        }}
+                        
                         function update() {{
                             var now = new Date().getTime();
                             var diff = endTime - now;
+                            
                             if (diff <= 0) {{
                                 timer.innerHTML = "00:00";
+                                timer.style.backgroundColor = "#ff0000";
+                                timer.style.animation = "blink 1s infinite";
+                                
+                                if (!alerted) {{
+                                    alerted = true;
+                                    playAlertSound();
+                                    alert("🔴 TEMPO ESGOTADO!\\n\\nBata o ponto no VR AGORA!");
+                                }}
+                                
                                 clearInterval(x);
-                                alert("🔴 TEMPO ESGOTADO!\\n\\nBata o ponto no VR!");
                                 return;
                             }}
+                            
                             var m = Math.floor((diff % (1000*60*60)) / (1000*60));
                             var s = Math.floor((diff % (1000*60)) / 1000);
                             timer.innerHTML = (m<10?"0":"") + m + ":" + (s<10?"0":"") + s;
+                            
+                            // Alerta quando faltam 10 segundos
+                            if (m === 0 && s === 10 && !alerted) {{
+                                timer.style.backgroundColor = "#ffff00";
+                            }}
                         }}
+                        
                         var x = setInterval(update, 1000);
                         update();
+                        
+                        // Adiciona animação de piscar
+                        var style = document.createElement('style');
+                        style.innerHTML = `
+                            @keyframes blink {{
+                                0%, 50% {{ opacity: 1; }}
+                                51%, 100% {{ opacity: 0.3; }}
+                            }}
+                        `;
+                        document.head.appendChild(style);
                     </script>
                 """, height=220)
                 
-                st.warning("🔴 Se o tempo acabar, bata o ponto no VR antes de finalizar!")
+                st.warning("🔴 Quando o tempo acabar, um ALARME vai tocar 3x! Bata o ponto no VR antes de finalizar!")
                 
                 if st.button("✅ FINALIZAR E VOLTAR"):
                     try:
