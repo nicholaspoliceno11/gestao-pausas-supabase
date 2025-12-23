@@ -1,0 +1,355 @@
+import streamlit as st
+from supabase import create_client, Client
+from datetime import datetime, timedelta
+import pandas as pd
+import pytz
+import requests
+
+# --- CONFIGURAÇÃO DISCORD ---
+DISCORD_WEBHOOK_EQUIPE = "https://discord.com/api/webhooks/1452314030357348353/-ty01Mp6tabaM4U9eICtKHJiitsNUoEa9CFs04ivKmvg2FjEBRQ8CSjPJtSD91ZkrvUi"
+DISCORD_WEBHOOK_GESTAO = "https://discord.com/api/webhooks/1452088104616722475/mIVeSKVD0mtLErmlTt5QqnQvYpDBEw7TpH7CdZB0A0H1Ms5iFWZqZdGmcRY78EpsJ_pI"
+
+# --- CONFIGURAÇÃO SUPABASE ---
+SUPABASE_URL = "https://gzozaxrigjzjrqfvdxzw.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6b3pxeHJsZ2R6anJxZnZkeHp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0OTg1MjIsImV4cCI6MjA4MjA3NDUyMn0.dLEjBPESUz5KnVwxqEMaMxoy65gsLqG2QdjK2xFTUhU"
+
+TIMEZONE_SP = pytz.timezone('America/Sao_Paulo')
+
+def get_now():
+    return datetime.now(TIMEZONE_SP)
+
+def enviar_discord(webhook_url, mensagem):
+    try:
+        requests.post(webhook_url, json={"content": mensagem}, timeout=5)
+    except:
+        pass
+
+# --- CONFIGURAÇÃO VISUAL ---
+st.set_page_config(page_title="Gestão de Pausas - QP", layout="centered")
+
+st.markdown("""
+    <style>
+    header, footer, .stDeployButton, #MainMenu {display: none !important;}
+    .stApp { background-color: white !important; }
+    [data-testid="stSidebar"] { background-color: #004a99 !important; }
+    [data-testid="stSidebar"] * { color: white !important; }
+    h1, h2, h3 { color: #004a99 !important; font-weight: bold !important; }
+    
+    div[data-baseweb="select"] { background-color: white !important; }
+    div[data-baseweb="select"] > div { background-color: white !important; color: black !important; }
+    input[type="number"] { background-color: white !important; color: black !important; }
+    button[kind="stepperButton"] { background-color: #f0f2f6 !important; color: #333 !important; }
+    input[type="text"], input[type="email"], input[type="password"] { 
+        background-color: white !important; 
+        color: black !important; 
+        border: 1px solid #ddd !important; 
+    }
+    
+    button[kind="primary"], button[kind="secondary"] {
+        background-color: #004a99 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: bold !important;
+        padding: 0.5rem 1rem !important;
+    }
+    
+    button[kind="primary"]:hover, button[kind="secondary"]:hover {
+        background-color: #003d7a !important;
+    }
+    
+    label[data-baseweb="radio"] { color: black !important; }
+    div[data-testid="stDataFrame"] { background-color: white !important; }
+    div[data-testid="stDataFrame"] table { color: black !important; }
+    
+    .logo-qp { 
+        font-family: 'Arial Black', sans-serif; 
+        font-size: 35pt; 
+        color: #004a99 !important; 
+        text-align: center; 
+    }
+    .subtitulo-qp { 
+        font-size: 16pt; 
+        color: #666 !important; 
+        text-align: center; 
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- CONEXÃO SUPABASE ---
+@st.cache_resource
+def conectar_supabase():
+    try:
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
+    except:
+        return None
+
+supabase: Client = conectar_supabase()
+
+if supabase:
+    st.markdown('<div class="logo-qp">Quero Passagem</div><div class="subtitulo-qp">Gestão de Pausa</div>', unsafe_allow_html=True)
+    st.divider()
+
+    # Inicializar session_state
+    if 'logado' not in st.session_state:
+        st.session_state.logado = False
+    if 'pausa_ativa' not in st.session_state:
+        st.session_state.pausa_ativa = False
+
+    # Carregar usuários
+    usuarios_response = supabase.table('usuarios').select('*').execute()
+    usuarios_db = {u['email'].lower(): u for u in usuarios_response.data}
+
+    if not st.session_state.logado:
+        st.markdown("### 🔐 Login")
+        u_log = st.text_input("E-mail").strip().lower()
+        p_log = st.text_input("Senha", type="password")
+        
+        if st.button("ACESSAR SISTEMA"):
+            if u_log in usuarios_db and usuarios_db[u_log]['senha'] == p_log:
+                st.session_state.logado = True
+                st.session_state.user_atual = u_log
+                
+                # Verifica primeiro acesso
+                if usuarios_db[u_log].get('primeiro_acesso', True):
+                    st.session_state.precisa_trocar_senha = True
+                else:
+                    st.session_state.precisa_trocar_senha = False
+                
+                st.rerun()
+            else:
+                st.error("Login ou senha incorretos.")
+    
+    elif st.session_state.get('precisa_trocar_senha', False):
+        # TELA DE TROCA DE SENHA
+        st.markdown("### 🔐 Primeiro Acesso - Alterar Senha")
+        st.warning("⚠️ Por segurança, você precisa criar uma nova senha.")
+        st.info("💡 A senha deve ter pelo menos 6 caracteres.")
+        
+        nova_senha = st.text_input("Nova Senha", type="password", key="nova")
+        confirma_senha = st.text_input("Confirme a Nova Senha", type="password", key="conf")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✅ ALTERAR SENHA"):
+                if not nova_senha or not confirma_senha:
+                    st.error("⚠️ Preencha todos os campos!")
+                elif nova_senha != confirma_senha:
+                    st.error("❌ As senhas não coincidem!")
+                elif len(nova_senha) < 6:
+                    st.error("❌ A senha deve ter pelo menos 6 caracteres!")
+                else:
+                    try:
+                        # Atualiza senha e primeiro_acesso no Supabase
+                        supabase.table('usuarios').update({
+                            'senha': nova_senha,
+                            'primeiro_acesso': False
+                        }).eq('email', st.session_state.user_atual).execute()
+                        
+                        st.success("✅ Senha alterada com sucesso!")
+                        st.session_state.precisa_trocar_senha = False
+                        st.cache_resource.clear()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Erro ao atualizar senha: {e}")
+        
+        with col2:
+            if st.button("🚪 Cancelar e Sair"):
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
+                st.rerun()
+    
+    else:
+        # SISTEMA PRINCIPAL
+        u_info = usuarios_db.get(st.session_state.user_atual, {})
+        cargo = str(u_info.get('tipo', '')).lower()
+        
+        st.sidebar.markdown(f"## 👤 {u_info.get('nome')}")
+        if st.sidebar.button("Sair"):
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
+
+        # ADMIN/SUPERVISOR
+        if any(x in cargo for x in ['admin', 'supervisor', 'gestão']):
+            menu = st.radio("Ações:", ["Liberar Pausa", "Histórico", "Gestão de Equipe"], 
+                          horizontal=True, label_visibility="collapsed")
+            st.divider()
+            
+            if menu == "Liberar Pausa":
+                st.subheader("Autorizar Pausa")
+                atendentes = [email for email, info in usuarios_db.items() 
+                            if 'atendente' in info.get('tipo', '').lower()]
+                
+                alvo = st.selectbox("Atendente SAC:", atendentes)
+                tempo_alvo = st.number_input("Duração (minutos):", 1, 120, 15)
+                
+                if st.button("AUTORIZAR PAUSA"):
+                    try:
+                        supabase.table('escalas').insert({
+                            'email': alvo,
+                            'nome': usuarios_db[alvo]['nome'],
+                            'duracao': tempo_alvo,
+                            'status': 'Pendente',
+                            'inicio': get_now().isoformat()
+                        }).execute()
+                        
+                        enviar_discord(DISCORD_WEBHOOK_EQUIPE, 
+                                     f"🔔 **{usuarios_db[alvo]['nome']}**, sua pausa foi liberada!")
+                        st.success("✅ Pausa liberada com sucesso!")
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
+
+            elif menu == "Histórico":
+                st.subheader("📊 Histórico de Pausas")
+                try:
+                    hist_response = supabase.table('historico').select('*').order('created_at', desc=True).limit(20).execute()
+                    df = pd.DataFrame(hist_response.data)
+                    if not df.empty:
+                        df['data'] = pd.to_datetime(df['data']).dt.strftime('%d/%m/%Y')
+                        st.dataframe(df[['nome', 'data', 'h_saida', 'h_retorno', 'duracao']], 
+                                   use_container_width=True)
+                    else:
+                        st.info("Nenhum histórico encontrado.")
+                except Exception as e:
+                    st.error(f"Erro ao carregar histórico: {e}")
+
+            elif menu == "Gestão de Equipe":
+                st.subheader("👥 Gerenciamento de Usuários")
+                t1, t2 = st.tabs(["➕ Adicionar", "🗑️ Excluir"])
+                
+                with t1:
+                    with st.form("cad_user", clear_on_submit=True):
+                        f_nome = st.text_input("Nome")
+                        f_email = st.text_input("Email").strip().lower()
+                        f_senha = st.text_input("Senha Temporária")
+                        st.caption("⚠️ O usuário deverá trocar esta senha no primeiro acesso")
+                        f_tipo = st.selectbox("Perfil", ["atendente sac", "supervisor", "administrador"])
+                        
+                        if st.form_submit_button("SALVAR"):
+                            try:
+                                supabase.table('usuarios').insert({
+                                    'nome': f_nome,
+                                    'email': f_email,
+                                    'senha': f_senha,
+                                    'tipo': f_tipo,
+                                    'primeiro_acesso': True
+                                }).execute()
+                                
+                                st.success(f"✅ Usuário {f_nome} criado com sucesso!")
+                                st.info(f"🔑 Senha temporária: {f_senha}")
+                                st.cache_resource.clear()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro: {e}")
+                
+                with t2:
+                    remover = st.selectbox("Escolha para remover:", list(usuarios_db.keys()))
+                    if st.button("REMOVER PERMANENTEMENTE"):
+                        try:
+                            user_id = usuarios_db[remover]['id']
+                            supabase.table('usuarios').delete().eq('id', user_id).execute()
+                            st.success("Usuário removido!")
+                            st.cache_resource.clear()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao remover: {e}")
+
+        # ATENDENTE
+        else:
+            st.subheader("⏱️ Minha Pausa")
+            
+            if not st.session_state.pausa_ativa:
+                if st.button("🔄 VERIFICAR MINHA LIBERAÇÃO"):
+                    try:
+                        pausa_response = supabase.table('escalas').select('*')\
+                            .eq('email', st.session_state.user_atual)\
+                            .eq('status', 'Pendente').execute()
+                        
+                        if pausa_response.data:
+                            pausa = pausa_response.data[0]
+                            st.session_state.tempo_pausa = pausa['duracao']
+                            st.session_state.pausa_id = pausa['id']
+                            st.session_state.pausa_liberada = True
+                            st.success(f"✅ Autorizado: {pausa['duracao']} minutos!")
+                            st.balloons()
+                        else:
+                            st.info("⏳ Aguardando autorização do supervisor...")
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
+                
+                if st.session_state.get('pausa_liberada'):
+                    if st.button(f"🚀 INICIAR {st.session_state.tempo_pausa} MINUTOS"):
+                        try:
+                            # Atualiza status para "Em Pausa"
+                            supabase.table('escalas').update({'status': 'Em Pausa'})\
+                                .eq('id', st.session_state.pausa_id).execute()
+                            
+                            st.session_state.pausa_ativa = True
+                            hora_final = get_now() + timedelta(minutes=st.session_state.tempo_pausa)
+                            st.session_state.h_termino_ms = hora_final.timestamp() * 1000
+                            st.session_state.h_saida = get_now().strftime("%H:%M:%S")
+                            
+                            enviar_discord(DISCORD_WEBHOOK_GESTAO, 
+                                         f"🚀 **{u_info['nome']}** INICIOU a pausa.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro: {e}")
+            
+            else:
+                # CRONÔMETRO
+                st.components.v1.html(f"""
+                    <div id="timer" style="font-size: 80px; font-weight: bold; text-align: center; 
+                         color: #ff4b4b; padding: 20px; border: 4px solid #ff4b4b; 
+                         border-radius: 15px; background-color: #fffafa;">--:--</div>
+                    <script>
+                        var endTime = {st.session_state.h_termino_ms};
+                        var timer = document.getElementById('timer');
+                        function update() {{
+                            var now = new Date().getTime();
+                            var diff = endTime - now;
+                            if (diff <= 0) {{
+                                timer.innerHTML = "00:00";
+                                clearInterval(x);
+                                alert("🔴 TEMPO ESGOTADO!\\n\\nBata o ponto no VR!");
+                                return;
+                            }}
+                            var m = Math.floor((diff % (1000*60*60)) / (1000*60));
+                            var s = Math.floor((diff % (1000*60)) / 1000);
+                            timer.innerHTML = (m<10?"0":"") + m + ":" + (s<10?"0":"") + s;
+                        }}
+                        var x = setInterval(update, 1000);
+                        update();
+                    </script>
+                """, height=220)
+                
+                st.warning("🔴 Se o tempo acabar, bata o ponto no VR antes de finalizar!")
+                
+                if st.button("✅ FINALIZAR E VOLTAR"):
+                    try:
+                        # Registra no histórico
+                        supabase.table('historico').insert({
+                            'email': st.session_state.user_atual,
+                            'nome': u_info['nome'],
+                            'data': get_now().date().isoformat(),
+                            'h_saida': st.session_state.h_saida,
+                            'h_retorno': get_now().strftime("%H:%M:%S"),
+                            'duracao': st.session_state.tempo_pausa
+                        }).execute()
+                        
+                        # Remove da escala
+                        supabase.table('escalas').delete()\
+                            .eq('id', st.session_state.pausa_id).execute()
+                        
+                        enviar_discord(DISCORD_WEBHOOK_GESTAO, 
+                                     f"✅ **{u_info['nome']}** FINALIZOU a pausa.")
+                        
+                        st.session_state.pausa_ativa = False
+                        st.session_state.pausa_liberada = False
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
+
+else:
+    st.error("❌ Erro ao conectar com o banco de dados.")
+    st.info("Verifique se SUPABASE_URL e SUPABASE_KEY estão corretos.")
