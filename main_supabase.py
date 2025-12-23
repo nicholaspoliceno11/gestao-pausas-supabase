@@ -24,16 +24,21 @@ def get_now():
     return datetime.now(TIMEZONE_SP)
 
 def enviar_discord(webhook_url, mensagem):
-    try: requests.post(webhook_url, json={"content": mensagem}, timeout=5)
-    except: pass
+    try: 
+        requests.post(webhook_url, json={"content": mensagem}, timeout=5)
+    except: 
+        pass
 
+# --- FUNÇÃO DE E-MAIL COM MODELO COMPLETO ---
 def enviar_email_boas_vindas(nome, email_destino, senha_temp):
     try:
         msg = MIMEMultipart()
         msg['From'] = f"Gestão de Pausas QP <{GMAIL_USER}>"
         msg['To'] = email_destino
         msg['Subject'] = "🎉 Bem-vindo ao Sistema de Gestão de Pausas - Quero Passagem"
+
         corpo = f"""Olá {nome},
+
 Você foi cadastrado no Sistema de Gestão de Pausas da Quero Passagem!
 
 🔐 SEUS DADOS DE ACESSO:
@@ -45,35 +50,62 @@ Senha Temporária: {senha_temp}
 
 ⚠️ IMPORTANTE: No primeiro acesso, você será solicitado a criar uma nova senha (mínimo 6 caracteres).
 
+📋 COMO FUNCIONA O SISTEMA:
+1️⃣ SOLICITAR PAUSA: Faça login e clique em "VERIFICAR MINHA LIBERAÇÃO".
+2️⃣ INICIAR PAUSA: Quando autorizado, clique em "INICIAR". O cronômetro começará.
+3️⃣ ALERTA: O sistema emitirá um ALARME SONORO ao finalizar o tempo.
+4️⃣ FINALIZAR: BATA O PONTO NO VR antes de clicar em "FINALIZAR" no sistema.
+
+💡 DICA: Mantenha a aba do navegador aberta para ouvir o alarme.
+
 Atenciosamente,
 Gestão de Pausas - Quero Passagem"""
+
         msg.attach(MIMEText(corpo, 'plain'))
         server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls(); server.login(GMAIL_USER, GMAIL_PASSWORD)
-        server.send_message(msg); server.quit()
+        server.starttls()
+        server.login(GMAIL_USER, GMAIL_PASSWORD)
+        server.send_message(msg)
+        server.quit()
         return True
-    except: return False
+    except:
+        return False
 
 def gerar_csv(df):
     return df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
 
 # --- UI E ESTILO ---
 st.set_page_config(page_title="Gestão de Pausas - QP", layout="centered")
-st.markdown("""<style>header, footer, .stDeployButton, #MainMenu {display: none !important;} .stApp { background-color: white !important; } [data-testid="stSidebar"] { background-color: #004a99 !important; } [data-testid="stSidebar"] * { color: white !important; } .logo-qp { font-family: 'Arial Black', sans-serif; font-size: 35pt; color: #004a99 !important; text-align: center; } .subtitulo-qp { font-size: 16pt; color: #666 !important; text-align: center; }</style>""", unsafe_allow_html=True)
+st.markdown("""<style>
+header, footer, .stDeployButton, #MainMenu {display: none !important;} 
+.stApp { background-color: white !important; } 
+[data-testid="stSidebar"] { background-color: #004a99 !important; } 
+[data-testid="stSidebar"] * { color: white !important; } 
+.logo-qp { font-family: 'Arial Black', sans-serif; font-size: 35pt; color: #004a99 !important; text-align: center; } 
+.subtitulo-qp { font-size: 16pt; color: #666 !important; text-align: center; }
+</style>""", unsafe_allow_html=True)
 
 @st.cache_resource
 def conectar_supabase():
-    try: return create_client(SUPABASE_URL, SUPABASE_KEY)
-    except: return None
+    try: 
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
+    except: 
+        return None
 
 supabase = conectar_supabase()
 
 if supabase:
     st.markdown('<div class="logo-qp">Quero Passagem</div><div class="subtitulo-qp">Gestão de Pausa</div>', unsafe_allow_html=True)
-    if 'logado' not in st.session_state: st.session_state.logado = False
+    
+    if 'logado' not in st.session_state: 
+        st.session_state.logado = False
 
-    usuarios_resp = supabase.table('usuarios').select('*').execute()
-    usuarios_db = {u['email'].lower(): u for u in usuarios_resp.data}
+    try:
+        usuarios_resp = supabase.table('usuarios').select('*').execute()
+        usuarios_db = {u['email'].lower(): u for u in usuarios_resp.data}
+    except Exception as e:
+        st.error("❌ Erro ao carregar usuários do banco de dados.")
+        st.stop()
 
     if not st.session_state.logado:
         st.markdown("### 🔐 Login")
@@ -81,148 +113,318 @@ if supabase:
         p_input = st.text_input("Senha", type="password")
         if st.button("ACESSAR SISTEMA"):
             if u_input in usuarios_db and usuarios_db[u_input]['senha'] == p_input:
-                st.session_state.update({"logado": True, "user_atual": u_input, "precisa_trocar": usuarios_db[u_input].get('primeiro_acesso', True)})
+                st.session_state.update({
+                    "logado": True, 
+                    "user_atual": u_input, 
+                    "precisa_trocar": usuarios_db[u_input].get('primeiro_acesso', True)
+                })
                 st.rerun()
-            else: st.error("Login ou senha inválidos.")
+            else: 
+                st.error("❌ Login ou senha inválidos.")
     
     elif st.session_state.get('precisa_trocar'):
-        nova = st.text_input("Nova Senha", type="password")
-        if st.button("ALTERAR") and len(nova) >= 6:
-            supabase.table('usuarios').update({'senha': nova, 'primeiro_acesso': False}).eq('email', st.session_state.user_atual).execute()
-            st.session_state.precisa_trocar = False; st.rerun()
+        st.markdown("### 🔑 Primeira Senha - Criar Nova Senha")
+        st.info("Por segurança, você precisa criar uma nova senha no primeiro acesso.")
+        nova = st.text_input("Nova Senha (mínimo 6 caracteres)", type="password")
+        confirma = st.text_input("Confirme a Nova Senha", type="password")
+        
+        if st.button("ALTERAR SENHA"):
+            if len(nova) < 6:
+                st.error("❌ A senha deve ter pelo menos 6 caracteres!")
+            elif nova != confirma:
+                st.error("❌ As senhas não coincidem!")
+            else:
+                try:
+                    supabase.table('usuarios').update({
+                        'senha': nova, 
+                        'primeiro_acesso': False
+                    }).eq('email', st.session_state.user_atual).execute()
+                    st.session_state.precisa_trocar = False
+                    st.success("✅ Senha alterada com sucesso!")
+                    st.rerun()
+                except Exception as e:
+                    st.error("❌ Erro ao alterar senha. Tente novamente.")
 
     else:
         u_info = usuarios_db.get(st.session_state.user_atual, {})
         cargo = str(u_info.get('tipo', '')).lower()
         st.sidebar.write(f"## 👤 {u_info.get('nome')}")
-        if st.sidebar.button("Sair"): st.session_state.clear(); st.rerun()
+        if st.sidebar.button("Sair"): 
+            st.session_state.clear()
+            st.rerun()
 
         if any(x in cargo for x in ['admin', 'supervisor', 'gestão']):
             menu = st.radio("Ações:", ["Liberar Pausa", "Histórico", "Gestão de Equipe", "Correções"], horizontal=True)
             st.divider()
 
             if menu == "Liberar Pausa":
+                st.subheader("🚀 Liberar Pausa para Atendente")
                 at = [e for e, i in usuarios_db.items() if 'atendente' in i['tipo'].lower()]
-                alvo = st.selectbox("Atendente SAC:", at)
-                minutos = st.number_input("Duração (minutos):", 1, 120, 15)
-                if st.button("AUTORIZAR PAUSA"):
-                    supabase.table('escalas').insert({'email':alvo,'nome':usuarios_db[alvo]['nome'],'duracao':minutos,'status':'Pendente','inicio':get_now().isoformat()}).execute()
-                    enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🔔 {usuarios_db[alvo]['nome']}, sua pausa foi liberada!")
-                    st.success("✅ Liberado!")
+                
+                if not at:
+                    st.warning("⚠️ Não há atendentes cadastrados no sistema.")
+                else:
+                    alvo = st.selectbox("Selecione o Atendente SAC:", at)
+                    minutos = st.number_input("Duração da Pausa (minutos):", min_value=1, max_value=120, value=15)
+                    
+                    if st.button("✅ AUTORIZAR PAUSA"):
+                        try:
+                            supabase.table('escalas').insert({
+                                'email': alvo,
+                                'nome': usuarios_db[alvo]['nome'],
+                                'duracao': minutos,
+                                'status': 'Pendente'
+                            }).execute()
+                            enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🔔 {usuarios_db[alvo]['nome']}, sua pausa foi liberada!")
+                            st.success(f"✅ Pausa de {minutos} minutos liberada para {usuarios_db[alvo]['nome']}!")
+                        except Exception as e:
+                            st.error("❌ Erro ao liberar pausa. Tente novamente.")
 
             elif menu == "Histórico":
                 st.subheader("📊 Histórico de Pausas")
-                h_resp = supabase.table('historico').select('*').order('created_at', desc=True).execute()
-                if h_resp.data:
-                    df = pd.DataFrame(h_resp.data)
-                    df['data'] = pd.to_datetime(df['data']).dt.strftime('%d/%m/%Y')
-                    st.dataframe(df[['nome', 'data', 'h_saida', 'h_retorno', 'duracao']], use_container_width=True)
-                    st.download_button("📥 Baixar para Google Planilhas (CSV)", data=gerar_csv(df), file_name=f"historico_{date.today()}.csv", mime="text/csv")
-                else: st.info("Histórico vazio.")
+                try:
+                    h_resp = supabase.table('historico').select('*').order('created_at', desc=True).execute()
+                    if h_resp.data and len(h_resp.data) > 0:
+                        df = pd.DataFrame(h_resp.data)
+                        df['data'] = pd.to_datetime(df['data']).dt.strftime('%d/%m/%Y')
+                        
+                        st.dataframe(
+                            df[['nome', 'data', 'h_saida', 'h_retorno', 'duracao']], 
+                            use_container_width=True,
+                            height=400
+                        )
+                        
+                        st.download_button(
+                            "📥 Baixar Histórico (CSV para Google Planilhas)", 
+                            data=gerar_csv(df), 
+                            file_name=f"historico_pausas_{date.today().strftime('%Y%m%d')}.csv", 
+                            mime="text/csv"
+                        )
+                    else: 
+                        st.info("📭 Histórico vazio. Ainda não há registros de pausas finalizadas.")
+                except Exception as e:
+                    st.error("❌ Erro ao carregar histórico. Tente novamente.")
 
             elif menu == "Gestão de Equipe":
-                tab_add, tab_del = st.tabs(["➕ Adicionar", "🗑️ Excluir"])
+                st.subheader("👥 Gerenciamento de Equipe")
+                tab_add, tab_del = st.tabs(["➕ Adicionar Usuário", "🗑️ Remover Usuário"])
+                
                 with tab_add:
+                    st.markdown("#### Cadastrar Novo Usuário")
                     with st.form("add_user", clear_on_submit=True):
-                        n, e, s = st.text_input("Nome"), st.text_input("Email").lower(), st.text_input("Senha Temp")
-                        t = st.selectbox("Perfil", ["atendente sac", "supervisor", "administrador"])
-                        if st.form_submit_button("SALVAR"):
-                            supabase.table('usuarios').insert({'nome':n,'email':e,'senha':s,'tipo':t,'primeiro_acesso':True}).execute()
-                            enviar_email_boas_vindas(n, e, s)
-                            st.success("✅ Usuário criado e e-mail enviado!"); st.rerun()
+                        n = st.text_input("Nome Completo*")
+                        e = st.text_input("E-mail Corporativo*").strip().lower()
+                        s = st.text_input("Senha Temporária* (mínimo 6 caracteres)")
+                        t = st.selectbox("Perfil de Acesso*", ["atendente sac", "supervisor", "administrador"])
+                        
+                        if st.form_submit_button("💾 CADASTRAR USUÁRIO"):
+                            if not n or not e or not s:
+                                st.error("❌ Preencha todos os campos obrigatórios!")
+                            elif len(s) < 6:
+                                st.error("❌ A senha temporária deve ter pelo menos 6 caracteres!")
+                            elif e in usuarios_db:
+                                st.error("❌ Este e-mail já está cadastrado no sistema!")
+                            else:
+                                try:
+                                    supabase.table('usuarios').insert({
+                                        'nome': n,
+                                        'email': e,
+                                        'senha': s,
+                                        'tipo': t,
+                                        'primeiro_acesso': True
+                                    }).execute()
+                                    
+                                    email_enviado = enviar_email_boas_vindas(n, e, s)
+                                    
+                                    if email_enviado:
+                                        st.success(f"✅ Usuário **{n}** criado com sucesso! E-mail de boas-vindas enviado.")
+                                    else:
+                                        st.warning(f"✅ Usuário **{n}** criado, mas houve erro ao enviar e-mail. Informe os dados manualmente.")
+                                    
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error("❌ Erro ao cadastrar usuário. Verifique os dados e tente novamente.")
+                
                 with tab_del:
-                    remover = st.selectbox("Selecione para remover:", list(usuarios_db.keys()))
-                    if st.button("REMOVER PERMANENTEMENTE"):
-                        supabase.table('usuarios').delete().eq('id', usuarios_db[remover]['id']).execute()
-                        st.success("🗑️ Usuário removido!"); st.rerun()
+                    st.markdown("#### Remover Usuário do Sistema")
+                    st.warning("⚠️ **ATENÇÃO:** Esta ação é permanente e não pode ser desfeita!")
+                    
+                    if len(usuarios_db) == 0:
+                        st.info("Não há usuários cadastrados para remover.")
+                    else:
+                        remover = st.selectbox("Selecione o usuário para remover:", list(usuarios_db.keys()))
+                        
+                        st.markdown(f"""
+                        **Dados do usuário:**
+                        - **Nome:** {usuarios_db[remover]['nome']}
+                        - **E-mail:** {remover}
+                        - **Perfil:** {usuarios_db[remover]['tipo']}
+                        """)
+                        
+                        confirmacao = st.text_input("Digite 'CONFIRMAR' para remover o usuário:", key="confirmar_exclusao")
+                        
+                        if st.button("🗑️ REMOVER PERMANENTEMENTE"):
+                            if confirmacao == "CONFIRMAR":
+                                try:
+                                    supabase.table('usuarios').delete().eq('id', usuarios_db[remover]['id']).execute()
+                                    st.success(f"🗑️ Usuário **{usuarios_db[remover]['nome']}** removido com sucesso!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error("❌ Erro ao remover usuário. Tente novamente.")
+                            else:
+                                st.error("❌ Você precisa digitar 'CONFIRMAR' para prosseguir!")
 
             elif menu == "Correções":
                 st.subheader("⚠️ Destravar Funcionário")
-                esc = supabase.table('escalas').select('*').execute()
-                if esc.data:
-                    sel = st.selectbox("Funcionário:", [f"{x['nome']} ({x['email']})" for x in esc.data])
-                    cod = st.text_input("Código Mestre", type="password")
-                    if st.button("DESTRAVAR AGORA") and cod == CODIGO_MESTRE_GESTAO:
-                        id_e = esc.data[[f"{x['nome']} ({x['email']})" for x in esc.data].index(sel)]['id']
-                        supabase.table('escalas').delete().eq('id', id_e).execute()
-                        st.success("✅ Resetado!"); st.rerun()
-                else: st.write("Ninguém travado.")
+                st.markdown("""
+                Esta funcionalidade permite destravar funcionários que ficaram com pausas ativas no sistema 
+                (geralmente por problemas técnicos ou fechamento acidental da página).
+                """)
+                
+                try:
+                    esc = supabase.table('escalas').select('*').execute()
+                    
+                    if esc.data and len(esc.data) > 0:
+                        st.warning(f"⚠️ Existem **{len(esc.data)}** registro(s) de pausa ativa no sistema.")
+                        
+                        # Criar lista de opções com informações detalhadas
+                        opcoes = [f"{x['nome']} ({x['email']}) - Status: {x['status']}" for x in esc.data]
+                        sel = st.selectbox("Selecione o funcionário para destravar:", opcoes)
+                        
+                        # Exibir informações do registro selecionado
+                        idx = opcoes.index(sel)
+                        registro = esc.data[idx]
+                        
+                        st.info(f"""
+                        **Detalhes do registro:**
+                        - **Nome:** {registro['nome']}
+                        - **E-mail:** {registro['email']}
+                        - **Status:** {registro['status']}
+                        - **Duração:** {registro.get('duracao', 'N/A')} minutos
+                        """)
+                        
+                        st.warning("⚠️ Esta ação irá **remover completamente** o registro de pausa ativa do funcionário.")
+                        
+                        cod = st.text_input("Digite o Código Mestre para confirmar:", type="password", key="codigo_mestre")
+                        
+                        col1, col2 = st.columns([1, 3])
+                        with col1:
+                            if st.button("🔓 DESTRAVAR"):
+                                if cod == CODIGO_MESTRE_GESTAO:
+                                    try:
+                                        id_e = registro['id']
+                                        supabase.table('escalas').delete().eq('id', id_e).execute()
+                                        enviar_discord(
+                                            DISCORD_WEBHOOK_GESTAO, 
+                                            f"🔓 **{registro['nome']}** foi destravado pela gestão através do código mestre."
+                                        )
+                                        st.success(f"✅ Funcionário **{registro['nome']}** destravado com sucesso!")
+                                        st.balloons()
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"❌ Erro ao destravar funcionário: {str(e)}")
+                                else:
+                                    st.error("❌ Código Mestre incorreto!")
+                    else:
+                        st.success("✅ Não há funcionários com pausas ativas ou travadas no momento.")
+                        st.info("O sistema está funcionando normalmente. Esta tela só exibe registros quando há problemas.")
+                        
+                except Exception as e:
+                    st.error(f"❌ Erro ao carregar dados de escalas: {str(e)}")
+                    st.write("Por favor, tente novamente. Se o erro persistir, contate o suporte técnico.")
 
-        else: # --- LÓGICA DO ATENDENTE (COM RECUPERAÇÃO DE QUEDA) ---
+        else: # ATENDENTE
             st.subheader("⏱️ Minha Pausa")
             
-            # Recuperação automática se o site travar/atualizar
-            res_recupera = supabase.table('escalas').select('*').eq('email', st.session_state.user_atual).eq('status', 'Em Pausa').execute()
-            
-            if res_recupera.data and 'pausa_ativa' not in st.session_state:
-                pausa_salva = res_recupera.data[0]
-                inicio_dt = datetime.fromisoformat(pausa_salva['inicio'].replace('Z', '+00:00')).astimezone(TIMEZONE_SP)
-                fim_dt = inicio_dt + timedelta(minutes=pausa_salva['duracao'])
+            if 'pausa_ativa' not in st.session_state or not st.session_state.pausa_ativa:
+                col1, col2 = st.columns([1, 1])
                 
-                if get_now() < fim_dt:
-                    st.session_state.update({
-                        "pausa_ativa": True, 
-                        "p_id": pausa_salva['id'], 
-                        "t_pausa": pausa_salva['duracao'],
-                        "fim": fim_dt.timestamp() * 1000,
-                        "saida": inicio_dt.strftime("%H:%M:%S")
-                    })
-                    st.warning("⚠️ Sua pausa foi recuperada após uma queda de conexão!")
-                else:
-                    st.error("🚨 Seu tempo de pausa expirou durante a queda de conexão. Finalize agora!")
-                    st.session_state.update({
-                        "pausa_ativa": True, "p_id": pausa_salva['id'], "t_pausa": pausa_salva['duracao'],
-                        "fim": get_now().timestamp() * 1000, "saida": inicio_dt.strftime("%H:%M:%S")
-                    })
-
-            if not st.session_state.get('pausa_ativa'):
-                if st.button("🔄 VERIFICAR MINHA LIBERAÇÃO"):
-                    res = supabase.table('escalas').select('*').eq('email', st.session_state.user_atual).eq('status', 'Pendente').execute()
-                    if res.data:
-                        st.session_state.update({"t_pausa": res.data[0]['duracao'], "p_id": res.data[0]['id'], "liberado": True})
-                        st.success(f"✅ Autorizado: {st.session_state.t_pausa} min!"); st.balloons()
-                    else: st.info("⏳ Aguardando liberação...")
+                with col1:
+                    if st.button("🔄 VERIFICAR MINHA LIBERAÇÃO", use_container_width=True):
+                        try:
+                            res = supabase.table('escalas').select('*').eq('email', st.session_state.user_atual).eq('status', 'Pendente').execute()
+                            if res.data and len(res.data) > 0:
+                                st.session_state.update({
+                                    "t_pausa": res.data[0]['duracao'], 
+                                    "p_id": res.data[0]['id'], 
+                                    "liberado": True
+                                })
+                                st.success(f"✅ Pausa autorizada: {st.session_state.t_pausa} minutos!")
+                                st.balloons()
+                                st.rerun()
+                            else: 
+                                st.info("⏳ Aguardando liberação da gestão...")
+                        except Exception as e:
+                            st.error("❌ Erro ao verificar liberação. Tente novamente.")
                 
-                if st.session_state.get('liberado') and st.button("🚀 INICIAR"):
-                    # Registramos o 'inicio' exato no banco para poder recuperar depois
-                    hora_inicio = get_now()
-                    supabase.table('escalas').update({
-                        'status': 'Em Pausa', 
-                        'inicio': hora_inicio.isoformat()
-                    }).eq('id', st.session_state.p_id).execute()
-                    
-                    st.session_state.update({
-                        "pausa_ativa": True, 
-                        "fim": (hora_inicio + timedelta(minutes=st.session_state.t_pausa)).timestamp() * 1000, 
-                        "saida": hora_inicio.strftime("%H:%M:%S")
-                    })
-                    enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🚀 **{u_info['nome']}** iniciou."); st.rerun()
+                if st.session_state.get('liberado'):
+                    with col2:
+                        if st.button("🚀 INICIAR PAUSA AGORA", use_container_width=True, type="primary"):
+                            try:
+                                supabase.table('escalas').update({'status': 'Em Pausa'}).eq('id', st.session_state.p_id).execute()
+                                st.session_state.update({
+                                    "pausa_ativa": True, 
+                                    "fim": (get_now() + timedelta(minutes=st.session_state.t_pausa)).timestamp() * 1000, 
+                                    "saida": get_now().strftime("%H:%M:%S")
+                                })
+                                enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🚀 **{u_info['nome']}** iniciou pausa de {st.session_state.t_pausa} minutos.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error("❌ Erro ao iniciar pausa. Tente novamente.")
             else:
+                st.markdown("### ⏱️ Cronômetro de Pausa")
                 st.components.v1.html(f"""
-                    <div id="timer" style="font-size: 80px; font-weight: bold; text-align: center; color: #ff4b4b; padding: 20px; border: 4px solid #ff4b4b; border-radius: 15px;">--:--</div>
+                    <div id="timer" style="font-size: 80px; font-weight: bold; text-align: center; color: #ff4b4b; padding: 20px; border: 4px solid #ff4b4b; border-radius: 15px; margin-bottom: 20px;">--:--</div>
                     <script>
                         var endTime = {st.session_state.fim};
                         function playBeep() {{
                             var ctx = new (window.AudioContext || window.webkitAudioContext)();
-                            var osc = ctx.createOscillator(); var g = ctx.createGain();
-                            osc.connect(g); g.connect(ctx.destination);
-                            osc.type = 'square'; osc.frequency.value = 1000;
+                            var osc = ctx.createOscillator(); 
+                            var g = ctx.createGain();
+                            osc.connect(g); 
+                            g.connect(ctx.destination);
+                            osc.type = 'square'; 
+                            osc.frequency.value = 1000;
                             g.gain.setValueAtTime(1, ctx.currentTime);
-                            osc.start(); osc.stop(ctx.currentTime + 2);
+                            osc.start(); 
+                            osc.stop(ctx.currentTime + 2);
                         }}
                         var x = setInterval(function() {{
                             var diff = endTime - new Date().getTime();
                             if (diff <= 0) {{
                                 document.getElementById('timer').innerHTML = "00:00";
-                                playBeep(); alert("🔴 TEMPO ESGOTADO! BATA O PONTO NO VR!"); clearInterval(x);
+                                playBeep(); 
+                                alert("🔴 TEMPO ESGOTADO! BATA O PONTO NO VR ANTES DE FINALIZAR!");
+                                clearInterval(x);
                             }} else {{
-                                var m = Math.floor(diff / 60000); var s = Math.floor((diff % 60000) / 1000);
+                                var m = Math.floor(diff / 60000); 
+                                var s = Math.floor((diff % 60000) / 1000);
                                 document.getElementById('timer').innerHTML = (m<10?"0":"")+m+":"+(s<10?"0":"")+s;
                             }}
                         }}, 1000);
                     </script>""", height=220)
-                if st.button("✅ FINALIZAR E VOLTAR"):
-                    supabase.table('historico').insert({'email': st.session_state.user_atual, 'nome': u_info['nome'], 'data': get_now().date().isoformat(), 'h_saida': st.session_state.saida, 'h_retorno': get_now().strftime("%H:%M:%S"), 'duracao': st.session_state.t_pausa}).execute()
-                    supabase.table('escalas').delete().eq('id', st.session_state.p_id).execute()
-                    enviar_discord(DISCORD_WEBHOOK_GESTAO, f"✅ **{u_info['nome']}** finalizou."); st.session_state.pausa_ativa = False; st.rerun()
-else: st.error("Erro de conexão.")
+                
+                st.warning("⚠️ **IMPORTANTE:** Bata o ponto no VR ANTES de clicar em 'FINALIZAR'!")
+                
+                if st.button("✅ FINALIZAR E VOLTAR AO TRABALHO", use_container_width=True, type="primary"):
+                    try:
+                        supabase.table('historico').insert({
+                            'email': st.session_state.user_atual, 
+                            'nome': u_info['nome'], 
+                            'data': get_now().date().isoformat(), 
+                            'h_saida': st.session_state.saida, 
+                            'h_retorno': get_now().strftime("%H:%M:%S"), 
+                            'duracao': st.session_state.t_pausa
+                        }).execute()
+                        
+                        supabase.table('escalas').delete().eq('id', st.session_state.p_id).execute()
+                        
+                        enviar_discord(DISCORD_WEBHOOK_GESTAO, f"✅ **{u_info['nome']}** finalizou pausa e retornou ao trabalho.")
+                        
+                        st.session_state.pausa_ativa = False
+                        st.success("✅ Pausa finalizada com sucesso!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error("❌ Erro ao finalizar pausa. Tente novamente ou contate a gestão.")
+else: 
+    st.error("❌ Erro ao conectar ao banco de dados. Verifique sua conexão e tente novamente.")
