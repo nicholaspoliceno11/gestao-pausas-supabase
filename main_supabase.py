@@ -133,14 +133,15 @@ if supabase:
     if not st.session_state.logado:
         # TELA DE LOGIN
         st.markdown("### 🔐 Login")
-        u_log_raw = st.text_input("E-mail", key="email_login")
+        u_log = st.text_input("E-mail", key="email_login")
         p_log = st.text_input("Senha", type="password", key="senha_login")
         
         if st.button("ACESSAR SISTEMA"):
             # Limpa e normaliza o email
-            u_log = u_log_raw.strip().lower() if u_log_raw else ""
+            u_log_clean = u_log.strip().lower() if u_log else ""
+            p_log_clean = p_log.strip() if p_log else ""
             
-            if not u_log or not p_log:
+            if not u_log_clean or not p_log_clean:
                 st.error("⚠️ Preencha todos os campos!")
             else:
                 try:
@@ -148,13 +149,13 @@ if supabase:
                     usuarios_response = supabase.table('usuarios').select('*').execute()
                     usuarios_db = {u['email'].strip().lower(): u for u in usuarios_response.data}
                     
-                    if u_log in usuarios_db and usuarios_db[u_log]['senha'] == p_log:
+                    if u_log_clean in usuarios_db and usuarios_db[u_log_clean]['senha'] == p_log_clean:
                         st.session_state.logado = True
-                        st.session_state.user_atual = u_log
+                        st.session_state.user_atual = u_log_clean
                         st.session_state.usuarios_db = usuarios_db
                         
                         # Verifica primeiro acesso
-                        if usuarios_db[u_log].get('primeiro_acesso', True):
+                        if usuarios_db[u_log_clean].get('primeiro_acesso', True):
                             st.session_state.precisa_trocar_senha = True
                         else:
                             st.session_state.precisa_trocar_senha = False
@@ -503,32 +504,44 @@ if supabase:
                         var timer = document.getElementById('timer');
                         var alerted = false;
                         
-                        // Cria o contexto de áudio
-                        var audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        // Cria o contexto de áudio IMEDIATAMENTE
+                        var audioContext = null;
+                        document.addEventListener('click', function() {{
+                            if (!audioContext) {{
+                                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                            }}
+                        }}, {{ once: true }});
                         
-                        // Função para tocar beep forte
+                        function ensureAudioContext() {{
+                            if (!audioContext) {{
+                                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                            }}
+                        }}
+                        
+                        // Função para tocar beep MUITO FORTE
                         function playBeep() {{
+                            ensureAudioContext();
                             var oscillator = audioContext.createOscillator();
                             var gainNode = audioContext.createGain();
                             
                             oscillator.connect(gainNode);
                             gainNode.connect(audioContext.destination);
                             
-                            oscillator.frequency.value = 800; // Frequência alta (Hz)
-                            oscillator.type = 'sine';
+                            oscillator.frequency.value = 1200; // Frequência MUITO alta
+                            oscillator.type = 'square'; // Onda quadrada (mais penetrante)
                             
-                            gainNode.gain.setValueAtTime(1, audioContext.currentTime); // Volume máximo
-                            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                            gainNode.gain.setValueAtTime(2.0, audioContext.currentTime); // Volume MÁXIMO
+                            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8);
                             
                             oscillator.start(audioContext.currentTime);
-                            oscillator.stop(audioContext.currentTime + 0.5);
+                            oscillator.stop(audioContext.currentTime + 0.8);
                         }}
                         
-                        // Função para tocar 3 beeps seguidos
+                        // Função para tocar 3 beeps MUITO FORTES
                         function playAlertSound() {{
                             playBeep();
-                            setTimeout(function() {{ playBeep(); }}, 600);
-                            setTimeout(function() {{ playBeep(); }}, 1200);
+                            setTimeout(function() {{ playBeep(); }}, 900);
+                            setTimeout(function() {{ playBeep(); }}, 1800);
                         }}
                         
                         function update() {{
