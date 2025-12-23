@@ -11,13 +11,13 @@ from email.mime.multipart import MIMEMultipart
 
 # --- CONFIGURAÇÕES ---
 GMAIL_USER = "gestao.queropassagem@gmail.com"
-GMAIL_PASSWORD = "pakiujauoxbmihyy" 
+GMAIL_PASSWORD = "pakiujauoxbmihyy"
 DISCORD_WEBHOOK_EQUIPE = "https://discord.com/api/webhooks/1452314030357348353/-ty01Mp6tabaM4U9eICtKHJiitsNUoEa9CFs04ivKmvg2FjEBRQ8CSjPJtSD91ZkrvUi"
 DISCORD_WEBHOOK_GESTAO = "https://discord.com/api/webhooks/1452088104616722475/mIVeSKVD0mtLErmlTt5QqnQvYpDBEw7TpH7CdZB0A0H1Ms5iFWZqZdGmcRY78EpsJ_pI"
 SUPABASE_URL = "https://gzozqxrlgdzjrqfvdxzw.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6b3pxeHJsZ2R6anJxZnZkeHp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0OTg1MjIsImV4cCI6MjA4MjA3NDUyMn0.dLEjBPESUz5KnVwxqEMaMxoy65gsLqG2QdjK2xFTUhU"
 
-CODIGO_MESTRE_GESTAO = "QP2025" 
+CODIGO_MESTRE_GESTAO = "QP2025"
 TIMEZONE_SP = pytz.timezone('America/Sao_Paulo')
 
 def get_now():
@@ -199,54 +199,59 @@ if supabase:
                         var endTime = {st.session_state.fim};
                         var audioContext = new (window.AudioContext || window.webkitAudioContext)();
                         var beepCount = 0;
-                        var maxBeeps = 3; // Número de bips desejados
-                        var beepInterval = 500; // Intervalo entre os bips em ms
+                        var beepInterval;
 
-                        function playBeep() {{
-                            var osc = audioContext.createOscillator();
-                            var gain = audioContext.createGain();
-                            osc.connect(gain);
-                            gain.connect(audioContext.destination);
-                            osc.type = "sine";
-                            osc.frequency.value = 880; // Frequência do bip
-                            gain.gain.setValueAtTime(0.8, audioContext.currentTime); // Aumenta o volume
-                            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4); // Duração do bip
-                            osc.start();
-                            osc.stop(audioContext.currentTime + 0.4);
+                        function playBeep(frequency, duration, volume, delay) {{
+                            setTimeout(() => {{
+                                var oscillator = audioContext.createOscillator();
+                                var gainNode = audioContext.createGain();
+
+                                oscillator.connect(gainNode);
+                                gainNode.connect(audioContext.destination);
+
+                                oscillator.type = 'sine';
+                                oscillator.frequency.value = frequency;
+                                gainNode.gain.value = volume;
+
+                                oscillator.start(audioContext.currentTime);
+                                oscillator.stop(audioContext.currentTime + duration);
+                            }}, delay);
                         }}
 
                         function startBeeping() {{
                             beepCount = 0;
-                            var beepTimer = setInterval(function() {{
-                                playBeep();
-                                beepCount++;
-                                if (beepCount >= maxBeeps) {{
-                                    clearInterval(beepTimer);
+                            beepInterval = setInterval(() => {{
+                                if (beepCount < 3) {{
+                                    playBeep(880, 0.3, 0.8, 0); // Frequência, duração, volume, delay
+                                    beepCount++;
+                                }} else {{
+                                    clearInterval(beepInterval);
                                 }}
-                            }}, beepInterval);
+                            }}, 500); // Intervalo de 500ms entre os bips
                         }}
 
                         var x = setInterval(function() {{
-                            var diff = endTime - new Date().getTime();
+                            var now = new Date().getTime();
+                            var diff = endTime - now;
+
                             if (diff <= 0) {{
                                 clearInterval(x);
                                 document.getElementById('timer').innerHTML = "00:00";
                                 document.getElementById('timer').style.backgroundColor = "#ff4b4b";
                                 document.getElementById('timer').style.color = "white";
-                                startBeeping(); // Inicia os bips múltiplos
-
-                                // Mensagem de alerta mais chamativa
-                                alert("🚨 ATENÇÃO! 🚨\\n\\nSua pausa finalizou!\\nPRIMEIRO: Bata o ponto principal no VR.\\nDEPOIS: Finalize sua pausa aqui no sistema.");
+                                startBeeping(); // Inicia os bips
+                                alert("🚨 ATENÇÃO! Sua pausa finalizou!\\n\\nPRIMEIRO, bata o ponto principal no VR e SÓ DEPOIS finalize aqui no site de gestão de pausas.");
                             }} else {{
                                 var m = Math.floor(diff / 60000);
                                 var s = Math.floor((diff % 60000) / 1000);
-                                document.getElementById('timer').innerHTML = (m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+                                document.getElementById('timer').innerHTML = (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
                             }}
                         }}, 1000);
                     </script>""", height=220)
                 if st.button("✅ FINALIZAR E VOLTAR", use_container_width=True, type="primary"):
                     supabase.table('historico').insert({'email': st.session_state.user_atual, 'nome': u_info['nome'], 'data': get_now().date().isoformat(), 'h_saida': st.session_state.saida, 'h_retorno': get_now().strftime("%H:%M:%S"), 'duracao': st.session_state.t_pausa}).execute()
                     supabase.table('escalas').delete().eq('id', st.session_state.p_id).execute()
+                    enviar_discord(DISCORD_WEBHOOK_GESTAO, f"✅ **{u_info['nome']}** finalizou a pausa e retornou.") # Adicionada notificação de finalização
                     st.session_state.pausa_ativa = False
                     st.rerun()
 
