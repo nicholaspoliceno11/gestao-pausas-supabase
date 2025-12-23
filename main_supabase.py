@@ -120,16 +120,33 @@ header, footer, .stDeployButton, #MainMenu {
     color: white !important;
 }
 
+/* Botão SAIR na sidebar */
 [data-testid="stSidebar"] button {
     background-color: rgba(255,255,255,0.2) !important;
+    color: white !important;
     border: 1px solid rgba(255,255,255,0.3) !important;
     border-radius: 8px !important;
     transition: all 0.3s ease !important;
+    font-weight: 600 !important;
+    padding: 10px 20px !important;
 }
 
 [data-testid="stSidebar"] button:hover {
-    background-color: rgba(255,255,255,0.3) !important;
+    background-color: rgba(255,255,255,0.35) !important;
     transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+}
+
+/* Nome do usuário na sidebar */
+[data-testid="stSidebar"] h2 {
+    background-color: rgba(255,255,255,0.15) !important;
+    padding: 15px !important;
+    border-radius: 8px !important;
+    margin: 10px 0 20px 0 !important;
+    text-align: center !important;
+    color: white !important;
+    font-size: 18px !important;
+    border: 1px solid rgba(255,255,255,0.2) !important;
 }
 
 /* Container principal com card */
@@ -222,7 +239,8 @@ input[type="password"]:focus {
 }
 
 [data-baseweb="select"] span,
-[data-baseweb="select"] div {
+[data-baseweb="select"] div,
+[data-baseweb="select"] * {
     color: #262730 !important;
 }
 
@@ -243,6 +261,28 @@ input[type="password"]:focus {
 
 [role="option"]:hover {
     background-color: #f3f4f6 !important;
+    color: #262730 !important;
+}
+
+/* Forçar texto preto em TODOS os elementos do selectbox */
+.stSelectbox [data-baseweb="select"] span[data-baseweb="select-value"],
+.stSelectbox [data-baseweb="select"] div[data-baseweb="select-value"] {
+    color: #262730 !important;
+}
+
+/* Opções do dropdown com texto preto */
+[data-baseweb="popover"] li {
+    color: #262730 !important;
+}
+
+[data-baseweb="popover"] li:hover {
+    background-color: #f3f4f6 !important;
+}
+
+/* Input interno do selectbox quando está aberto */
+.stSelectbox input {
+    color: #262730 !important;
+    background-color: white !important;
 }
 
 /* NUMBER INPUT */
@@ -383,14 +423,15 @@ h1, h2, h3 {
 
 /* TABS */
 .stTabs [data-baseweb="tab-list"] {
-    background-color: white !important;
+    background-color: #f3f4f6 !important;
     border-radius: 8px !important;
     padding: 4px !important;
-    border: 1px solid #e5e7eb !important;
+    gap: 4px !important;
 }
 
 .stTabs [data-baseweb="tab"] {
-    color: #6b7280 !important;
+    color: #4b5563 !important;
+    background-color: transparent !important;
     border-radius: 6px !important;
     padding: 10px 20px !important;
     font-weight: 600 !important;
@@ -398,11 +439,17 @@ h1, h2, h3 {
 }
 
 .stTabs [data-baseweb="tab"]:hover {
-    background-color: #f3f4f6 !important;
+    background-color: #e5e7eb !important;
+    color: #1f2937 !important;
 }
 
 .stTabs [aria-selected="true"] {
     background-color: #004a99 !important;
+    color: white !important;
+}
+
+/* Forçar texto branco na tab ativa */
+.stTabs [aria-selected="true"] * {
     color: white !important;
 }
 
