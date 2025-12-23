@@ -77,12 +77,167 @@ def gerar_csv(df):
 # --- UI E ESTILO ---
 st.set_page_config(page_title="Gestão de Pausas - QP", layout="centered")
 st.markdown("""<style>
-header, footer, .stDeployButton, #MainMenu {display: none !important;} 
-.stApp { background-color: white !important; } 
-[data-testid="stSidebar"] { background-color: #004a99 !important; } 
-[data-testid="stSidebar"] * { color: white !important; } 
-.logo-qp { font-family: 'Arial Black', sans-serif; font-size: 35pt; color: #004a99 !important; text-align: center; } 
-.subtitulo-qp { font-size: 16pt; color: #666 !important; text-align: center; }
+/* Forçar tema claro globalmente */
+:root {
+    color-scheme: light !important;
+}
+
+body, .stApp, [data-testid="stAppViewContainer"] {
+    background-color: white !important;
+    color: #262730 !important;
+}
+
+/* Esconder elementos do Streamlit */
+header, footer, .stDeployButton, #MainMenu {
+    display: none !important;
+} 
+
+/* Logo e título */
+.logo-qp { 
+    font-family: 'Arial Black', sans-serif; 
+    font-size: 35pt; 
+    color: #004a99 !important; 
+    text-align: center; 
+} 
+
+.subtitulo-qp { 
+    font-size: 16pt; 
+    color: #666 !important; 
+    text-align: center; 
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] { 
+    background-color: #004a99 !important; 
+} 
+
+[data-testid="stSidebar"] * { 
+    color: white !important; 
+}
+
+/* INPUTS DE TEXTO */
+.stTextInput > div > div > input,
+.stTextInput input,
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+    background-color: white !important;
+    color: #262730 !important;
+    border: 1px solid #cccccc !important;
+    border-radius: 4px !important;
+}
+
+.stTextInput > div > div > input::placeholder {
+    color: #999999 !important;
+}
+
+/* SELECTBOX */
+.stSelectbox > div > div,
+.stSelectbox > div > div > div,
+[data-baseweb="select"],
+[data-baseweb="select"] > div {
+    background-color: white !important;
+    color: #262730 !important;
+    border: 1px solid #cccccc !important;
+}
+
+[data-baseweb="select"] span,
+[data-baseweb="select"] div {
+    color: #262730 !important;
+}
+
+/* Dropdown do selectbox */
+[data-baseweb="popover"] {
+    background-color: white !important;
+}
+
+[role="listbox"],
+[role="option"] {
+    background-color: white !important;
+    color: #262730 !important;
+}
+
+[role="option"]:hover {
+    background-color: #f0f0f0 !important;
+}
+
+/* NUMBER INPUT */
+.stNumberInput > div > div > input,
+input[type="number"] {
+    background-color: white !important;
+    color: #262730 !important;
+    border: 1px solid #cccccc !important;
+}
+
+/* BOTÕES */
+.stButton > button {
+    background-color: white !important;
+    color: #262730 !important;
+    border: 1px solid #cccccc !important;
+}
+
+.stButton > button[kind="primary"] {
+    background-color: #004a99 !important;
+    color: white !important;
+}
+
+/* RADIO BUTTONS */
+.stRadio > div {
+    background-color: transparent !important;
+}
+
+.stRadio label {
+    color: #262730 !important;
+}
+
+/* DATAFRAMES */
+[data-testid="stDataFrame"],
+.stDataFrame {
+    background-color: white !important;
+    color: #262730 !important;
+}
+
+[data-testid="stDataFrame"] * {
+    color: #262730 !important;
+}
+
+/* TEXTO GERAL */
+p, span, div, label, h1, h2, h3, h4, h5, h6 {
+    color: #262730 !important;
+}
+
+/* Exceção para sidebar */
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span,
+[data-testid="stSidebar"] div,
+[data-testid="stSidebar"] label {
+    color: white !important;
+}
+
+/* TABS */
+.stTabs [data-baseweb="tab-list"] {
+    background-color: white !important;
+}
+
+.stTabs [data-baseweb="tab"] {
+    color: #262730 !important;
+}
+
+/* FORMS */
+form {
+    background-color: white !important;
+}
+
+/* INFO/WARNING/SUCCESS BOXES */
+.stAlert {
+    background-color: white !important;
+    color: #262730 !important;
+}
+
+/* Markdown e texto */
+.stMarkdown {
+    color: #262730 !important;
+}
 </style>""", unsafe_allow_html=True)
 
 @st.cache_resource
