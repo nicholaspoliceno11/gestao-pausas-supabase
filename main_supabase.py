@@ -120,21 +120,44 @@ header, footer, .stDeployButton, #MainMenu {
     color: white !important;
 }
 
-/* Botão SAIR na sidebar */
-[data-testid="stSidebar"] button {
-    background-color: rgba(255,255,255,0.2) !important;
+/* Botão SAIR na sidebar - CRÍTICO */
+[data-testid="stSidebar"] .stButton > button {
+    background-color: rgba(255, 255, 255, 0.25) !important;
     color: white !important;
-    border: 1px solid rgba(255,255,255,0.3) !important;
+    border: 2px solid rgba(255, 255, 255, 0.4) !important;
     border-radius: 8px !important;
     transition: all 0.3s ease !important;
     font-weight: 600 !important;
-    padding: 10px 20px !important;
+    padding: 12px 24px !important;
+    width: 100% !important;
+    margin-top: 10px !important;
+    font-size: 15px !important;
 }
 
-[data-testid="stSidebar"] button:hover {
-    background-color: rgba(255,255,255,0.35) !important;
+[data-testid="stSidebar"] .stButton > button:hover {
+    background-color: rgba(255, 255, 255, 0.4) !important;
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+    border-color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Forçar texto branco no botão da sidebar */
+[data-testid="stSidebar"] .stButton > button *,
+[data-testid="stSidebar"] button *,
+[data-testid="stSidebar"] button span,
+[data-testid="stSidebar"] button div,
+[data-testid="stSidebar"] button p {
+    color: white !important;
+    background-color: transparent !important;
+}
+
+/* Forçar visibilidade do texto "Sair" */
+[data-testid="stSidebar"] button[kind="secondary"] {
+    color: white !important;
+}
+
+[data-testid="stSidebar"] button::before {
+    color: white !important;
 }
 
 /* Nome do usuário na sidebar */
@@ -238,10 +261,36 @@ input[type="password"]:focus {
     border-color: #004a99 !important;
 }
 
+/* FORÇAR texto preto em TODOS os elementos do selectbox */
 [data-baseweb="select"] span,
 [data-baseweb="select"] div,
-[data-baseweb="select"] * {
+[data-baseweb="select"] *,
+.stSelectbox span,
+.stSelectbox div {
     color: #262730 !important;
+}
+
+/* Valor selecionado - CRÍTICO */
+[data-baseweb="select"] [role="combobox"],
+[data-baseweb="select"] [data-baseweb="input"],
+.stSelectbox [data-baseweb="select"] > div > div {
+    color: #262730 !important;
+    background-color: white !important;
+}
+
+/* Forçar texto preto no valor exibido após seleção */
+[data-baseweb="select"] [role="button"] > div,
+[data-baseweb="select"] [role="button"] span,
+.stSelectbox [data-baseweb="select"] span[role="option"],
+div[class*="StyledControlContainer"] > div,
+div[class*="StyledValueContainer"] {
+    color: #262730 !important;
+}
+
+/* Texto do input do selectbox */
+[data-baseweb="select"] input[role="combobox"] {
+    color: #262730 !important;
+    caret-color: #262730 !important;
 }
 
 /* Dropdown do selectbox */
@@ -252,6 +301,7 @@ input[type="password"]:focus {
     border: 1px solid #e5e7eb !important;
 }
 
+/* Lista de opções */
 [role="listbox"],
 [role="option"] {
     background-color: white !important;
@@ -264,14 +314,11 @@ input[type="password"]:focus {
     color: #262730 !important;
 }
 
-/* Forçar texto preto em TODOS os elementos do selectbox */
-.stSelectbox [data-baseweb="select"] span[data-baseweb="select-value"],
-.stSelectbox [data-baseweb="select"] div[data-baseweb="select-value"] {
-    color: #262730 !important;
-}
-
-/* Opções do dropdown com texto preto */
-[data-baseweb="popover"] li {
+/* Forçar texto preto nas opções do dropdown */
+[data-baseweb="popover"] li,
+[data-baseweb="popover"] li *,
+[data-baseweb="popover"] span,
+[data-baseweb="popover"] div {
     color: #262730 !important;
 }
 
@@ -279,7 +326,7 @@ input[type="password"]:focus {
     background-color: #f3f4f6 !important;
 }
 
-/* Input interno do selectbox quando está aberto */
+/* Input interno do selectbox */
 .stSelectbox input {
     color: #262730 !important;
     background-color: white !important;
