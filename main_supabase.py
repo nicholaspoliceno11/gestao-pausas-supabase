@@ -12,6 +12,7 @@ DISCORD_WEBHOOK_GESTAO = "https://discord.com/api/webhooks/1452088104616722475/m
 # --- CONFIGURAÇÃO SUPABASE ---
 SUPABASE_URL = "https://gzozqxrlgdzjrqfvdxzw.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6b3pxeHJsZ2R6anJxZnZkeHp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0OTg1MjIsImV4cCI6MjA4MjA3NDUyMn0.dLEjBPESUz5KnVwxqEMaMxoy65gsLqG2QdjK2xFTUhU"
+
 TIMEZONE_SP = pytz.timezone('America/Sao_Paulo')
 
 def get_now():
