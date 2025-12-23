@@ -9,7 +9,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# --- CONFIGURAÇÕES DE AMBIENTE ---
+# --- CONFIGURAÇÕES ---
 GMAIL_USER = "gestao.queropassagem@gmail.com"
 GMAIL_PASSWORD = "pakiujauoxbmihyy" 
 DISCORD_WEBHOOK_EQUIPE = "https://discord.com/api/webhooks/1452314030357348353/-ty01Mp6tabaM4U9eICtKHJiitsNUoEa9CFs04ivKmvg2FjEBRQ8CSjPJtSD91ZkrvUi"
@@ -27,26 +27,52 @@ def enviar_discord(webhook_url, mensagem):
     try: requests.post(webhook_url, json={"content": mensagem}, timeout=5)
     except: pass
 
+# --- FUNÇÃO DE E-MAIL COM MODELO COMPLETO ---
 def enviar_email_boas_vindas(nome, email_destino, senha_temp):
     try:
         msg = MIMEMultipart()
         msg['From'] = f"Gestão de Pausas QP <{GMAIL_USER}>"
         msg['To'] = email_destino
         msg['Subject'] = "🎉 Bem-vindo ao Sistema de Gestão de Pausas - Quero Passagem"
-        corpo = f"Olá {nome},\n\nSeu acesso ao sistema Quero Passagem foi criado!\n\nLink: https://gestao-pausas-supabase-rytpzdbzurqiuf53rgnusb.streamlit.app/\nE-mail: {email_destino}\nSenha Temporária: {senha_temp}\n\nIMPORTANTE: No primeiro acesso, você deverá criar uma nova senha."
+
+        corpo = f"""Olá {nome},
+
+Você foi cadastrado no Sistema de Gestão de Pausas da Quero Passagem!
+
+🔐 SEUS DADOS DE ACESSO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+Link: https://gestao-pausas-supabase-rytpzdbzurqiuf53rgnusb.streamlit.app/
+Email: {email_destino}
+Senha Temporária: {senha_temp}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ IMPORTANTE: No primeiro acesso, você será solicitado a criar uma nova senha (mínimo 6 caracteres).
+
+📋 COMO FUNCIONA O SISTEMA:
+1️⃣ SOLICITAR PAUSA: Faça login e clique em "VERIFICAR MINHA LIBERAÇÃO".
+2️⃣ INICIAR PAUSA: Quando autorizado, clique em "INICIAR". O cronômetro começará.
+3️⃣ ALERTA: O sistema emitirá um ALARME SONORO ao finalizar o tempo.
+4️⃣ FINALIZAR: BATA O PONTO NO VR antes de clicar em "FINALIZAR" no sistema.
+
+💡 DICA: Mantenha a aba do navegador aberta para ouvir o alarme.
+
+Atenciosamente,
+Gestão de Pausas - Quero Passagem"""
+
         msg.attach(MIMEText(corpo, 'plain'))
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
         server.login(GMAIL_USER, GMAIL_PASSWORD)
-        server.send_message(msg); server.quit()
+        server.send_message(msg)
+        server.quit()
         return True
-    except: return False
+    except:
+        return False
 
-# --- FUNÇÕES DE EXPORTAÇÃO ---
 def gerar_csv(df):
     return df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
 
-# --- CONFIGURAÇÃO VISUAL ---
+# --- UI E ESTILO ---
 st.set_page_config(page_title="Gestão de Pausas - QP", layout="centered")
 st.markdown("""<style>header, footer, .stDeployButton, #MainMenu {display: none !important;} .stApp { background-color: white !important; } [data-testid="stSidebar"] { background-color: #004a99 !important; } [data-testid="stSidebar"] * { color: white !important; } .logo-qp { font-family: 'Arial Black', sans-serif; font-size: 35pt; color: #004a99 !important; text-align: center; } .subtitulo-qp { font-size: 16pt; color: #666 !important; text-align: center; }</style>""", unsafe_allow_html=True)
 
@@ -61,7 +87,6 @@ if supabase:
     st.markdown('<div class="logo-qp">Quero Passagem</div><div class="subtitulo-qp">Gestão de Pausa</div>', unsafe_allow_html=True)
     if 'logado' not in st.session_state: st.session_state.logado = False
 
-    # Carregar base de usuários para validação
     usuarios_resp = supabase.table('usuarios').select('*').execute()
     usuarios_db = {u['email'].lower(): u for u in usuarios_resp.data}
 
@@ -73,11 +98,11 @@ if supabase:
             if u_input in usuarios_db and usuarios_db[u_input]['senha'] == p_input:
                 st.session_state.update({"logado": True, "user_atual": u_input, "precisa_trocar": usuarios_db[u_input].get('primeiro_acesso', True)})
                 st.rerun()
-            else: st.error("E-mail ou senha incorretos.")
+            else: st.error("Login ou senha inválidos.")
     
     elif st.session_state.get('precisa_trocar'):
-        nova = st.text_input("Defina sua nova senha (mínimo 6 caracteres)", type="password")
-        if st.button("CONFIRMAR SENHA") and len(nova) >= 6:
+        nova = st.text_input("Nova Senha", type="password")
+        if st.button("ALTERAR") and len(nova) >= 6:
             supabase.table('usuarios').update({'senha': nova, 'primeiro_acesso': False}).eq('email', st.session_state.user_atual).execute()
             st.session_state.precisa_trocar = False; st.rerun()
 
@@ -87,75 +112,70 @@ if supabase:
         st.sidebar.write(f"## 👤 {u_info.get('nome')}")
         if st.sidebar.button("Sair"): st.session_state.clear(); st.rerun()
 
-        # REESTRUTURAÇÃO DAS OPÇÕES DE GESTÃO
         if any(x in cargo for x in ['admin', 'supervisor', 'gestão']):
-            menu = st.radio("Selecione a Ação:", ["Liberar Pausa", "Histórico", "Gestão de Equipe", "Correções"], horizontal=True)
+            menu = st.radio("Ações:", ["Liberar Pausa", "Histórico", "Gestão de Equipe", "Correções"], horizontal=True)
             st.divider()
 
             if menu == "Liberar Pausa":
-                st.subheader("Autorizar Saída para Pausa")
                 at = [e for e, i in usuarios_db.items() if 'atendente' in i['tipo'].lower()]
-                alvo = st.selectbox("Selecione o Atendente:", at)
-                minutos = st.number_input("Duração Autorizada (min):", 1, 120, 15)
-                if st.button("LIBERAR AGORA"):
-                    supabase.table('escalas').insert({'email':alvo,'nome':usuarios_db[alvo]['nome'],'duracao':minutos,'status':'Pendente','inicio':get_now().isoformat()}).execute()
-                    enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🔔 **{usuarios_db[alvo]['nome']}**, sua pausa foi liberada!")
-                    st.success("Pausa autorizada com sucesso!")
+                alvo = st.selectbox("Atendente SAC:", at)
+                minutos = st.number_input("Duração (minutos):", 1, 120, 15)
+                if st.button("AUTORIZAR PAUSA"):
+                    supabase.table('escalas').insert({'email':alvo,'nome':usuarios_db[alvo]['nome'],'duracao':minutos,'status':'Pendente'}).execute()
+                    enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🔔 {usuarios_db[alvo]['nome']}, sua pausa foi liberada!")
+                    st.success("✅ Liberado!")
 
             elif menu == "Histórico":
-                st.subheader("📊 Relatório Geral de Pausas")
+                st.subheader("📊 Histórico de Pausas")
                 h_resp = supabase.table('historico').select('*').order('created_at', desc=True).execute()
                 if h_resp.data:
                     df = pd.DataFrame(h_resp.data)
                     df['data'] = pd.to_datetime(df['data']).dt.strftime('%d/%m/%Y')
                     st.dataframe(df[['nome', 'data', 'h_saida', 'h_retorno', 'duracao']], use_container_width=True)
-                    st.download_button("📥 Exportar para Google Planilhas (CSV)", data=gerar_csv(df), file_name=f"pausas_{date.today()}.csv", mime="text/csv")
+                    st.download_button("📥 Baixar para Google Planilhas (CSV)", data=gerar_csv(df), file_name=f"historico_{date.today()}.csv", mime="text/csv")
                 else: st.info("Histórico vazio.")
 
             elif menu == "Gestão de Equipe":
-                tab_add, tab_del = st.tabs(["➕ Adicionar Funcionário", "🗑️ Remover Funcionário"])
+                tab_add, tab_del = st.tabs(["➕ Adicionar", "🗑️ Excluir"])
                 with tab_add:
-                    with st.form("add_form", clear_on_submit=True):
-                        nome_n = st.text_input("Nome Completo")
-                        email_n = st.text_input("E-mail Corporativo").lower()
-                        senha_n = st.text_input("Senha Temporária")
-                        tipo_n = st.selectbox("Cargo/Perfil", ["atendente sac", "supervisor", "administrador"])
-                        if st.form_submit_button("CADASTRAR"):
-                            supabase.table('usuarios').insert({'nome':nome_n,'email':email_n,'senha':senha_n,'tipo':tipo_n,'primeiro_acesso':True}).execute()
-                            enviar_email_boas_vindas(nome_n, email_n, senha_n)
-                            st.success("Funcionário cadastrado e e-mail enviado!")
-                            st.rerun()
+                    with st.form("add_user", clear_on_submit=True):
+                        n = st.text_input("Nome"); e = st.text_input("Email").lower(); s = st.text_input("Senha Temp")
+                        t = st.selectbox("Perfil", ["atendente sac", "supervisor", "administrador"])
+                        if st.form_submit_button("SALVAR"):
+                            supabase.table('usuarios').insert({'nome':n,'email':e,'senha':s,'tipo':t,'primeiro_acesso':True}).execute()
+                            enviar_email_boas_vindas(n, e, s)
+                            st.success("✅ Usuário criado e e-mail enviado!"); st.rerun()
                 with tab_del:
-                    remover = st.selectbox("Escolha quem remover:", list(usuarios_db.keys()))
-                    if st.button("REMOVER DEFINITIVAMENTE"):
+                    remover = st.selectbox("Selecione para remover:", list(usuarios_db.keys()))
+                    if st.button("REMOVER PERMANENTEMENTE"):
                         supabase.table('usuarios').delete().eq('id', usuarios_db[remover]['id']).execute()
-                        st.success("Usuário excluído."); st.rerun()
+                        st.success("🗑️ Usuário removido!"); st.rerun()
 
             elif menu == "Correções":
-                st.subheader("⚠️ Destravar Status de Funcionário")
+                st.subheader("⚠️ Destravar Funcionário")
                 esc = supabase.table('escalas').select('*').execute()
                 if esc.data:
-                    travado = st.selectbox("Funcionário Travado:", [f"{x['nome']} ({x['email']})" for x in esc.data])
-                    cod = st.text_input("Digite o Código Mestre", type="password")
-                    if st.button("FORÇAR DESTRAVAMENTO") and cod == CODIGO_MESTRE_GESTAO:
-                        id_e = esc.data[[f"{x['nome']} ({x['email']})" for x in esc.data].index(travado)]['id']
+                    sel = st.selectbox("Funcionário:", [f"{x['nome']} ({x['email']})" for x in esc.data])
+                    cod = st.text_input("Código Mestre", type="password")
+                    if st.button("DESTRAVAR AGORA") and cod == CODIGO_MESTRE_GESTAO:
+                        id_e = esc.data[[f"{x['nome']} ({x['email']})" for x in esc.data].index(sel)]['id']
                         supabase.table('escalas').delete().eq('id', id_e).execute()
-                        st.success("Status resetado com sucesso!"); st.rerun()
-                else: st.write("Não há funcionários travados no momento.")
+                        st.success("✅ Resetado!"); st.rerun()
+                else: st.write("Ninguém travado.")
 
-        else: # INTERFACE DO ATENDENTE
-            st.subheader("⏱️ Painel de Pausa")
+        else: # ATENDENTE
+            st.subheader("⏱️ Minha Pausa")
             if 'pausa_ativa' not in st.session_state or not st.session_state.pausa_ativa:
                 if st.button("🔄 VERIFICAR MINHA LIBERAÇÃO"):
                     res = supabase.table('escalas').select('*').eq('email', st.session_state.user_atual).eq('status', 'Pendente').execute()
                     if res.data:
                         st.session_state.update({"t_pausa": res.data[0]['duracao'], "p_id": res.data[0]['id'], "liberado": True})
-                        st.success(f"Sua pausa de {st.session_state.t_pausa} min foi liberada!"); st.balloons()
-                    else: st.info("Aguardando autorização da gestão...")
-                if st.session_state.get('liberado') and st.button("🚀 INICIAR AGORA"):
+                        st.success(f"✅ Autorizado: {st.session_state.t_pausa} min!"); st.balloons()
+                    else: st.info("⏳ Aguardando liberação...")
+                if st.session_state.get('liberado') and st.button("🚀 INICIAR"):
                     supabase.table('escalas').update({'status': 'Em Pausa'}).eq('id', st.session_state.p_id).execute()
                     st.session_state.update({"pausa_ativa": True, "fim": (get_now() + timedelta(minutes=st.session_state.t_pausa)).timestamp() * 1000, "saida": get_now().strftime("%H:%M:%S")})
-                    enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🚀 **{u_info['nome']}** iniciou a pausa."); st.rerun()
+                    enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🚀 **{u_info['nome']}** iniciou."); st.rerun()
             else:
                 st.components.v1.html(f"""
                     <div id="timer" style="font-size: 80px; font-weight: bold; text-align: center; color: #ff4b4b; padding: 20px; border: 4px solid #ff4b4b; border-radius: 15px;">--:--</div>
@@ -173,15 +193,15 @@ if supabase:
                             var diff = endTime - new Date().getTime();
                             if (diff <= 0) {{
                                 document.getElementById('timer').innerHTML = "00:00";
-                                playBeep(); alert("🔴 TEMPO ESGOTADO! BATA O PONTO NO VR AGORA!"); clearInterval(x);
+                                playBeep(); alert("🔴 TEMPO ESGOTADO! BATA O PONTO NO VR!"); clearInterval(x);
                             }} else {{
                                 var m = Math.floor(diff / 60000); var s = Math.floor((diff % 60000) / 1000);
                                 document.getElementById('timer').innerHTML = (m<10?"0":"")+m+":"+(s<10?"0":"")+s;
                             }}
                         }}, 1000);
                     </script>""", height=220)
-                if st.button("✅ FINALIZAR PAUSA (Bati o Ponto no VR)"):
+                if st.button("✅ FINALIZAR E VOLTAR"):
                     supabase.table('historico').insert({'email': st.session_state.user_atual, 'nome': u_info['nome'], 'data': get_now().date().isoformat(), 'h_saida': st.session_state.saida, 'h_retorno': get_now().strftime("%H:%M:%S"), 'duracao': st.session_state.t_pausa}).execute()
                     supabase.table('escalas').delete().eq('id', st.session_state.p_id).execute()
-                    enviar_discord(DISCORD_WEBHOOK_GESTAO, f"✅ **{u_info['nome']}** finalizou a pausa."); st.session_state.pausa_ativa = False; st.rerun()
-else: st.error("Erro crítico de conexão com o banco de dados Supabase.")
+                    enviar_discord(DISCORD_WEBHOOK_GESTAO, f"✅ **{u_info['nome']}** finalizou."); st.session_state.pausa_ativa = False; st.rerun()
+else: st.error("Erro de conexão.")
