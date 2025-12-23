@@ -244,7 +244,7 @@ input[type="password"]:focus {
     color: #9ca3af !important;
 }
 
-/* SELECTBOX - SOLUÇÃO DEFINITIVA */
+/* SELECTBOX - SOLUÇÃO RADICAL COM FILTER */
 .stSelectbox > div > div,
 .stSelectbox > div > div > div,
 [data-baseweb="select"],
@@ -255,13 +255,14 @@ input[type="password"]:focus {
     border-radius: 8px !important;
     padding: 8px 12px !important;
     transition: all 0.3s ease !important;
+    -webkit-text-fill-color: #262730 !important;
 }
 
 [data-baseweb="select"]:hover {
     border-color: #004a99 !important;
 }
 
-/* CRÍTICO - Forçar preto em ABSOLUTAMENTE TUDO no selectbox */
+/* ABSOLUTAMENTE TUDO - COM -webkit-text-fill-color */
 .stSelectbox *,
 [data-baseweb="select"] *,
 [data-baseweb="select"] span,
@@ -271,29 +272,41 @@ input[type="password"]:focus {
 .stSelectbox div,
 .stSelectbox p {
     color: #262730 !important;
+    -webkit-text-fill-color: #262730 !important;
+    opacity: 1 !important;
 }
 
-/* Valor selecionado - MÁXIMA PRIORIDADE */
+/* Valor selecionado - TODAS AS PROPRIEDADES POSSÍVEIS */
 [data-baseweb="select"] [role="combobox"],
 [data-baseweb="select"] [data-baseweb="input"],
 .stSelectbox [data-baseweb="select"] > div > div {
     color: #262730 !important;
     background-color: white !important;
+    -webkit-text-fill-color: #262730 !important;
+    opacity: 1 !important;
 }
 
-/* Forçar texto preto no valor exibido após seleção - TODAS AS VARIAÇÕES */
+/* Valor exibido - MÁXIMA ESPECIFICIDADE */
 [data-baseweb="select"] [role="button"] > div,
 [data-baseweb="select"] [role="button"] span,
 [data-baseweb="select"] [role="button"] *,
+[data-baseweb="select"] [role="button"] > div > div,
+[data-baseweb="select"] [role="button"] > div > div > *,
 .stSelectbox [data-baseweb="select"] span[role="option"],
 div[class*="StyledControlContainer"] > div,
 div[class*="StyledControlContainer"] *,
 div[class*="StyledValueContainer"],
 div[class*="StyledValueContainer"] *,
 div[class*="StyledSingleValue"],
-div[class*="StyledSingleValue"] * {
+div[class*="StyledSingleValue"] *,
+div[class*="StyledPlaceholder"],
+div[class*="StyledPlaceholder"] * {
     color: #262730 !important;
+    -webkit-text-fill-color: #262730 !important;
     background-color: transparent !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: inline !important;
 }
 
 /* Texto do input do selectbox */
@@ -301,12 +314,14 @@ div[class*="StyledSingleValue"] * {
 [data-baseweb="select"] input {
     color: #262730 !important;
     caret-color: #262730 !important;
+    -webkit-text-fill-color: #262730 !important;
 }
 
 /* Placeholder do selectbox */
 [data-baseweb="select"] [data-baseweb="placeholder"],
 .stSelectbox [data-baseweb="placeholder"] {
     color: #9ca3af !important;
+    -webkit-text-fill-color: #9ca3af !important;
 }
 
 /* Dropdown do selectbox */
@@ -323,19 +338,22 @@ div[class*="StyledSingleValue"] * {
     background-color: white !important;
     color: #262730 !important;
     padding: 10px 16px !important;
+    -webkit-text-fill-color: #262730 !important;
 }
 
 [role="option"]:hover {
     background-color: #f3f4f6 !important;
     color: #262730 !important;
+    -webkit-text-fill-color: #262730 !important;
 }
 
-/* Opções do dropdown com texto preto - TODAS AS VARIAÇÕES */
+/* Opções do dropdown - TODAS AS VARIAÇÕES */
 [data-baseweb="popover"] li,
 [data-baseweb="popover"] span,
 [data-baseweb="popover"] div,
 [data-baseweb="popover"] * {
     color: #262730 !important;
+    -webkit-text-fill-color: #262730 !important;
 }
 
 [data-baseweb="popover"] li:hover {
@@ -346,17 +364,31 @@ div[class*="StyledSingleValue"] * {
 .stSelectbox input {
     color: #262730 !important;
     background-color: white !important;
+    -webkit-text-fill-color: #262730 !important;
 }
 
-/* Sobrescrever QUALQUER estilo inline do Streamlit */
-.stSelectbox [style*="color"] {
+/* Sobrescrever estilos inline */
+.stSelectbox [style*="color"],
+[data-baseweb="select"] [style*="color"] {
     color: #262730 !important;
+    -webkit-text-fill-color: #262730 !important;
 }
 
-/* Tags e chips dentro do selectbox (caso exista) */
+/* Tags e chips */
 [data-baseweb="tag"],
 [data-baseweb="tag"] * {
     color: #262730 !important;
+    -webkit-text-fill-color: #262730 !important;
+}
+
+/* HACK: Remover qualquer filtro ou opacidade que possa estar escondendo o texto */
+.stSelectbox [data-baseweb="select"] {
+    filter: none !important;
+}
+
+.stSelectbox [data-baseweb="select"] * {
+    filter: none !important;
+    text-shadow: none !important;
 }
 
 /* NUMBER INPUT */
