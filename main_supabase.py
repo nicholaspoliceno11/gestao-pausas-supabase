@@ -133,31 +133,37 @@ if supabase:
     if not st.session_state.logado:
         # TELA DE LOGIN
         st.markdown("### 🔐 Login")
-        u_log = st.text_input("E-mail").strip().lower()
-        p_log = st.text_input("Senha", type="password")
+        u_log_raw = st.text_input("E-mail", key="email_login")
+        p_log = st.text_input("Senha", type="password", key="senha_login")
         
         if st.button("ACESSAR SISTEMA"):
-            try:
-                # Carrega usuários apenas na hora do login
-                usuarios_response = supabase.table('usuarios').select('*').execute()
-                usuarios_db = {u['email'].lower(): u for u in usuarios_response.data}
-                
-                if u_log in usuarios_db and usuarios_db[u_log]['senha'] == p_log:
-                    st.session_state.logado = True
-                    st.session_state.user_atual = u_log
-                    st.session_state.usuarios_db = usuarios_db
+            # Limpa e normaliza o email
+            u_log = u_log_raw.strip().lower() if u_log_raw else ""
+            
+            if not u_log or not p_log:
+                st.error("⚠️ Preencha todos os campos!")
+            else:
+                try:
+                    # Carrega usuários apenas na hora do login
+                    usuarios_response = supabase.table('usuarios').select('*').execute()
+                    usuarios_db = {u['email'].strip().lower(): u for u in usuarios_response.data}
                     
-                    # Verifica primeiro acesso
-                    if usuarios_db[u_log].get('primeiro_acesso', True):
-                        st.session_state.precisa_trocar_senha = True
+                    if u_log in usuarios_db and usuarios_db[u_log]['senha'] == p_log:
+                        st.session_state.logado = True
+                        st.session_state.user_atual = u_log
+                        st.session_state.usuarios_db = usuarios_db
+                        
+                        # Verifica primeiro acesso
+                        if usuarios_db[u_log].get('primeiro_acesso', True):
+                            st.session_state.precisa_trocar_senha = True
+                        else:
+                            st.session_state.precisa_trocar_senha = False
+                        
+                        st.rerun()
                     else:
-                        st.session_state.precisa_trocar_senha = False
-                    
-                    st.rerun()
-                else:
-                    st.error("❌ Login ou senha incorretos.")
-            except Exception as e:
-                st.error(f"❌ Erro ao validar login: {e}")
+                        st.error("❌ Login ou senha incorretos.")
+                except Exception as e:
+                    st.error(f"❌ Erro ao validar login: {e}")
     
     elif st.session_state.get('precisa_trocar_senha', False):
         # TELA DE TROCA DE SENHA
