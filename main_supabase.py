@@ -244,7 +244,7 @@ input[type="password"]:focus {
     color: #9ca3af !important;
 }
 
-/* SELECTBOX */
+/* SELECTBOX - SOLUÇÃO DEFINITIVA */
 .stSelectbox > div > div,
 .stSelectbox > div > div > div,
 [data-baseweb="select"],
@@ -261,16 +261,19 @@ input[type="password"]:focus {
     border-color: #004a99 !important;
 }
 
-/* FORÇAR texto preto em TODOS os elementos do selectbox */
+/* CRÍTICO - Forçar preto em ABSOLUTAMENTE TUDO no selectbox */
+.stSelectbox *,
+[data-baseweb="select"] *,
 [data-baseweb="select"] span,
 [data-baseweb="select"] div,
-[data-baseweb="select"] *,
+[data-baseweb="select"] p,
 .stSelectbox span,
-.stSelectbox div {
+.stSelectbox div,
+.stSelectbox p {
     color: #262730 !important;
 }
 
-/* Valor selecionado - CRÍTICO */
+/* Valor selecionado - MÁXIMA PRIORIDADE */
 [data-baseweb="select"] [role="combobox"],
 [data-baseweb="select"] [data-baseweb="input"],
 .stSelectbox [data-baseweb="select"] > div > div {
@@ -278,19 +281,32 @@ input[type="password"]:focus {
     background-color: white !important;
 }
 
-/* Forçar texto preto no valor exibido após seleção */
+/* Forçar texto preto no valor exibido após seleção - TODAS AS VARIAÇÕES */
 [data-baseweb="select"] [role="button"] > div,
 [data-baseweb="select"] [role="button"] span,
+[data-baseweb="select"] [role="button"] *,
 .stSelectbox [data-baseweb="select"] span[role="option"],
 div[class*="StyledControlContainer"] > div,
-div[class*="StyledValueContainer"] {
+div[class*="StyledControlContainer"] *,
+div[class*="StyledValueContainer"],
+div[class*="StyledValueContainer"] *,
+div[class*="StyledSingleValue"],
+div[class*="StyledSingleValue"] * {
     color: #262730 !important;
+    background-color: transparent !important;
 }
 
 /* Texto do input do selectbox */
-[data-baseweb="select"] input[role="combobox"] {
+[data-baseweb="select"] input[role="combobox"],
+[data-baseweb="select"] input {
     color: #262730 !important;
     caret-color: #262730 !important;
+}
+
+/* Placeholder do selectbox */
+[data-baseweb="select"] [data-baseweb="placeholder"],
+.stSelectbox [data-baseweb="placeholder"] {
+    color: #9ca3af !important;
 }
 
 /* Dropdown do selectbox */
@@ -314,11 +330,11 @@ div[class*="StyledValueContainer"] {
     color: #262730 !important;
 }
 
-/* Forçar texto preto nas opções do dropdown */
+/* Opções do dropdown com texto preto - TODAS AS VARIAÇÕES */
 [data-baseweb="popover"] li,
-[data-baseweb="popover"] li *,
 [data-baseweb="popover"] span,
-[data-baseweb="popover"] div {
+[data-baseweb="popover"] div,
+[data-baseweb="popover"] * {
     color: #262730 !important;
 }
 
@@ -326,10 +342,21 @@ div[class*="StyledValueContainer"] {
     background-color: #f3f4f6 !important;
 }
 
-/* Input interno do selectbox */
+/* Input interno do selectbox quando está aberto */
 .stSelectbox input {
     color: #262730 !important;
     background-color: white !important;
+}
+
+/* Sobrescrever QUALQUER estilo inline do Streamlit */
+.stSelectbox [style*="color"] {
+    color: #262730 !important;
+}
+
+/* Tags e chips dentro do selectbox (caso exista) */
+[data-baseweb="tag"],
+[data-baseweb="tag"] * {
+    color: #262730 !important;
 }
 
 /* NUMBER INPUT */
