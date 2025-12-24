@@ -171,8 +171,8 @@ if supabase:
                                 'duracao': minutos,
                                 'status': 'Agendada', # Novo status
                                 'horario_agendado': horario_agendado_str, # Salva como string HH:MM
-                                'supervisor_em': st.session_state.user_atual, # Usando 'supervisor_em'
-                                'supervisor_noi': u_info['nome'] # Usando 'supervisor_noi'
+                                'supervisor_email': st.session_state.user_atual, # CORRIGIDO: Usando 'supervisor_email'
+                                'supervisor_nome': u_info['nome'] # CORRIGIDO: Usando 'supervisor_nome'
                             }).execute()
 
                             # Alerta de agendamento de pausa para o Discord (formato específico)
