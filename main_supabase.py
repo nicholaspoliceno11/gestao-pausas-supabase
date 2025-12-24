@@ -186,7 +186,7 @@ if supabase:
                                 supabase.table('escalas').insert({
                                     'email': selected_email,
                                     'nome': atendentes_para_selecionar[selected_email],
-                                    'data': get_now().date().isoformat(),
+                                    'data': get_now().date().isoformat(), # Adicionado campo 'data'
                                     'horario_agendado': horario_agendado_str, # Salva a string digitada
                                     'horario_agendado_dt_utc': data_hora_agendada_com_tz.astimezone(pytz.utc).isoformat(), # Salva o datetime em UTC para cálculos
                                     'duracao': duracao_pausa,
@@ -344,7 +344,7 @@ if supabase:
                         st.session_state.fim = (get_now() + timedelta(minutes=st.session_state.t_pausa)).timestamp() * 1000
                         supabase.table('escalas').update({'status': 'Em Pausa', 'inicio': st.session_state.saida}).eq('id', st.session_state.p_id).execute()
                         # Notificação de início de pausa para o grupo de Gestão
-                        enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🚀 **{u_info['nome']}** INICIOU a pausa.")
+                        enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🚀 **{u_info['nome']}** INICIOU a pausa às {get_now().strftime('%H:%M')}.") # Adicionado horário
                         st.rerun()
 
                 elif pausa_data['status'] == 'Em Pausa':
@@ -416,8 +416,7 @@ if supabase:
                             'duracao': st.session_state.t_pausa
                         }).execute()
                         supabase.table('escalas').delete().eq('id', st.session_state.p_id).execute()
-                        # Notificação de fim de pausa para o grupo de Gestão
-                        enviar_discord(DISCORD_WEBHOOK_GESTAO, f"✅ **{u_info['nome']}** FINALIZOU a pausa.")
+                        enviar_discord(DISCORD_WEBHOOK_GESTAO, f"✅ **{u_info['nome']}** FINALIZOU a pausa às {get_now().strftime('%H:%M')}.") # Adicionado horário
                         st.session_state.pausa_ativa = False
                         st.rerun()
             else:
