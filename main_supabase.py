@@ -183,8 +183,8 @@ if supabase:
                                 'duracao': minutos,
                                 'status': 'Agendada',
                                 'horario_agendado': horario_agendado_str,
-                                'supervisor_email': st.session_state.user_atual,
-                                'supervisor_nome': u_info['nome']
+                                'supervisor_email': st.session_state.user_atual, # Usando 'supervisor_email'
+                                'supervisor_nome': u_info['nome'] # Usando 'supervisor_nome'
                             }).execute()
 
                             # Alerta de agendamento de pausa para o Discord (formato específico)
@@ -331,7 +331,7 @@ if supabase:
                         # Alerta de início de pausa para o Discord (formato específico)
                         mensagem_inicio = f"Atendente {u_info['nome']} iniciou a pausa."
                         print(f"DEBUG: Chamando enviar_discord para INÍCIO de pausa: {mensagem_inicio}") # DEBUG
-                        enviar_discord(DISCORD_WEBHOOK_SAC_QP, mensagem_inicio) # Enviando para o webhook sac-qp
+                        enviar_discord(DISCORD_WEBHOOK_SAC_QP, mensagem_inicio)
                         st.rerun()
             else: # Pausa está ativa (timer rodando)
                 st.components.v1.html(f"""
