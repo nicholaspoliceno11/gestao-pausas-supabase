@@ -170,7 +170,8 @@ if supabase:
                                 'email': atendente_email,
                                 'nome': atendente_nome,
                                 'duracao': duracao,
-                                'horario_agendado_time_obj': horario_agendado_input # Armazena o objeto time puro
+                                'horario_agendado_time_obj': horario_agendado_input, # Armazena o objeto time puro
+                                'horario_agendado_str': horario_agendado_input.strftime('%H:%M') # Armazena a string formatada para notificações
                             })
 
                         submitted = st.form_submit_button("✅ AGENDAR PAUSAS SELECIONADAS", type="primary")
@@ -193,13 +194,15 @@ if supabase:
                                 }).execute()
 
                                 # --- MENSAGEM DE SUCESSO NO STREAMLIT ---
-                                # Usa o objeto time puro para a exibição no Streamlit
-                                st.success(f"✅ Pausa agendada para {agendamento['nome']} às {agendamento['horario_agendado_time_obj'].strftime('%H:%M')} por {agendamento['duracao']} minutos.")
+                                # Usa a string formatada para a exibição no Streamlit
+                                st.success(f"✅ Pausa agendada para {agendamento['nome']} às {agendamento['horario_agendado_str']} por {agendamento['duracao']} minutos.")
 
-                                # --- NOTIFICAÇÃO DE AGENDAMENTO NO DISCORD ---
-                                # Também usa o objeto time puro para a exibição no Discord
-                                enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🗓️ **{agendamento['nome']}** teve a pausa agendada para **{agendamento['horario_agendado_time_obj'].strftime('%H:%M')}** por {agendamento['duracao']} minutos.")
-                                # --- FIM DA CORREÇÃO ---
+                                # --- NOTIFICAÇÃO DE AGENDAMENTO NO DISCORD (GRUPO SAC-QP) ---
+                                enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🗓️ **{agendamento['nome']}** teve a pausa agendada para **{agendamento['horario_agendado_str']}**.")
+
+                                # --- NOTIFICAÇÃO DE AGENDAMENTO NO DISCORD (GRUPO GESTÃO) ---
+                                enviar_discord(DISCORD_WEBHOOK_GESTAO, f"Supervisor **{u_info['nome']}** agendou a pausa de **{agendamento['nome']}** para **{agendamento['horario_agendado_str']}**.")
+                                # --- FIM DAS CORREÇÕES DE NOTIFICAÇÃO ---
 
                             # --- st.rerun() MOVIDO PARA FORA DO LOOP (já estava assim na última versão) ---
                             st.rerun() # Recarrega para atualizar a lista de atendentes pendentes
@@ -294,7 +297,7 @@ if supabase:
 
                     # Se faltam 10 minutos ou menos para a pausa agendada
                     if timedelta(minutes=0) <= tempo_para_pausa <= timedelta(minutes=10):
-                        # Envia notificação para o Discord
+                        # Envia notificação para o Discord (GRUPO SAC-QP)
                         mensagem_discord = f"🔔 **{u_info['nome']}**, sua pausa foi liberada para iniciar às {st.session_state.horario_agendado.strftime('%H:%M')}! Por favor, prepare-se para iniciar a pausa em breve."
                         enviar_discord(DISCORD_WEBHOOK_EQUIPE, mensagem_discord) # Envia para o webhook da equipe
 
@@ -327,7 +330,8 @@ if supabase:
                             "fim": (get_now() + timedelta(minutes=st.session_state.t_pausa)).timestamp() * 1000,
                             "saida": get_now().strftime("%H:%M:%S")
                         })
-                        enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🚀 **{u_info['nome']}** iniciou pausa às {get_now().strftime('%H:%M')}.")
+                        # --- NOTIFICAÇÃO DE INÍCIO DE PAUSA NO DISCORD (GRUPO GESTÃO) ---
+                        enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🚀 **{u_info['nome']}** INICIOU a pausa.")
                         st.rerun()
 
                 elif pausa_data['status'] == 'Em Pausa':
@@ -400,7 +404,8 @@ if supabase:
                             'duracao': st.session_state.t_pausa
                         }).execute()
                         supabase.table('escalas').delete().eq('id', st.session_state.p_id).execute()
-                        enviar_discord(DISCORD_WEBHOOK_GESTAO, f"✅ **{u_info['nome']}** finalizou a pausa e retornou às {get_now().strftime('%H:%M')}.")
+                        # --- NOTIFICAÇÃO DE FIM DE PAUSA NO DISCORD (GRUPO GESTÃO) ---
+                        enviar_discord(DISCORD_WEBHOOK_GESTAO, f"✅ **{u_info['nome']}** FINALIZOU a pausa.")
                         st.session_state.pausa_ativa = False
                         st.rerun()
             else:
