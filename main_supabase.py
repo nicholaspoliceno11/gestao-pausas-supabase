@@ -117,29 +117,22 @@ if supabase:
             st.rerun()
 
         if any(x in cargo for x in ['admin', 'supervisor', 'gestão']):
-            # --- CORREÇÃO AQUI: Menu de ações na área principal, com "Gestão de Equipe" de volta ---
             menu = st.radio("Ações:", ["Agendar Pausa", "Histórico de Pausas", "Gestão de Equipe", "Correções"], horizontal=True)
             st.divider()
-            # --- FIM DA CORREÇÃO ---
 
             if menu == "Agendar Pausa":
                 st.markdown("### 🗓️ Agendar Pausa para Atendente")
 
-                # Obter todos os atendentes
-                # Garante que estamos buscando usuários com tipo 'atendente' (case-insensitive)
                 todos_atendentes_resp = supabase.table('usuarios').select('email, nome, tipo').execute()
                 todos_atendentes_filtrados = {u['email'].lower(): u for u in todos_atendentes_resp.data if 'atendente' in u['tipo'].lower()}
 
-                # Obter pausas finalizadas hoje
                 hoje_iso = get_now().date().isoformat()
                 historico_hoje_resp = supabase.table('historico').select('email').eq('data', hoje_iso).execute()
                 emails_com_pausa_finalizada_hoje = {h['email'] for h in historico_hoje_resp.data}
 
-                # Obter pausas ativas ou agendadas
                 escalas_ativas_ou_agendadas_resp = supabase.table('escalas').select('email').in_('status', ['Agendada', 'Notificada', 'Em Pausa']).execute()
                 emails_com_pausa_ativa_ou_agendada = {e['email'] for e in escalas_ativas_ou_agendadas_resp.data}
 
-                # Atendentes que ainda precisam tirar pausa (não finalizaram e não têm ativa/agendada)
                 at_list_pendentes = [
                     e for e, i in todos_atendentes_filtrados.items() 
                     if e not in emails_com_pausa_finalizada_hoje and e not in emails_com_pausa_ativa_ou_agendada
@@ -222,7 +215,6 @@ if supabase:
                     else:
                         st.info("Nenhuma pausa registrada para esta data.")
 
-            # --- CORREÇÃO AQUI: Menu "Gestão de Equipe" de volta ---
             elif menu == "Gestão de Equipe":
                 st.markdown("### 👥 Gestão de Equipe")
                 tab_add, tab_del = st.tabs(["➕ Adicionar Usuário", "🗑️ Remover Usuário"])
@@ -251,7 +243,6 @@ if supabase:
                             else: st.error("❌ Código incorreto.")
                     else:
                         st.info("Nenhum usuário para remover (exceto você mesmo).")
-            # --- FIM DA CORREÇÃO ---
 
             elif menu == "Correções":
                 st.markdown("### 🛠️ Correções e Destravamento")
@@ -293,9 +284,6 @@ if supabase:
 
                 st.session_state.horario_agendado_str = pausa_data['horario_agendado']
 
-                # Para cálculos de tempo (10 minutos antes, etc.), usamos o campo 'horario_agendado_dt_utc'
-                # Convertemos de UTC para o fuso horário de SP
-                # --- CORREÇÃO AQUI: Tratamento de erro para horario_agendado_dt_utc ---
                 try:
                     horario_agendado_dt_utc = datetime.fromisoformat(pausa_data['horario_agendado_dt_utc'])
                     horario_agendado_dt_sp = horario_agendado_dt_utc.astimezone(TIMEZONE_SP)
@@ -303,7 +291,6 @@ if supabase:
                 except (ValueError, TypeError):
                     st.error("❌ Erro: Horário agendado para cálculo inválido no banco de dados. Contate a gestão.")
                     st.stop()
-                # --- FIM DA CORREÇÃO ---
 
                 if pausa_data['status'] in ['Agendada', 'Notificada']:
                     agora = get_now()
