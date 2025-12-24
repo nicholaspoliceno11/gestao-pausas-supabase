@@ -190,10 +190,13 @@ if supabase:
                                 }).execute()
                                 st.success(f"✅ Pausa agendada para {agendamento['nome']} às {agendamento['horario_agendado'].strftime('%H:%M')} por {agendamento['duracao']} minutos.")
 
-                                # --- LINHA ADICIONADA/CORRIGIDA PARA NOTIFICAÇÃO DE AGENDAMENTO NO DISCORD ---
+                                # --- LINHA DE NOTIFICAÇÃO DE AGENDAMENTO NO DISCORD ---
+                                # Usamos 'agendamento['horario_agendado']' diretamente para garantir que o horário exibido
+                                # seja o que o supervisor selecionou, sem interferência de fuso horário na string.
                                 enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🗓️ **{agendamento['nome']}** teve a pausa agendada para **{agendamento['horario_agendado'].strftime('%H:%M')}** por {agendamento['duracao']} minutos.")
-                                # --- FIM DA CORREÇÃO ---
+                                # --- FIM DA LINHA ---
 
+                            # --- CORREÇÃO: MOVIDO st.rerun() PARA FORA DO LOOP ---
                             st.rerun() # Recarrega para atualizar a lista de atendentes pendentes
 
             elif menu == "Histórico":
