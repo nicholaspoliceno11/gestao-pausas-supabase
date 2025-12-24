@@ -1,6 +1,6 @@
 import streamlit as st
 from supabase import create_client, Client
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, time # Importar time explicitamente
 import pandas as pd
 import pytz
 import requests
@@ -8,13 +8,13 @@ import io
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import time # Importar o módulo time para usar sleep
+# import time # Não é necessário para este caso específico, pois não estamos usando time.sleep()
 
 # --- CONFIGURAÇÕES ---
 GMAIL_USER = "gestao.queropassagem@gmail.com"
 GMAIL_PASSWORD = "pakiujauoxbmihyy"
 DISCORD_WEBHOOK_EQUIPE = "https://discord.com/api/webhooks/1452314030357348353/-ty01Mp6tabaM4U9eICtKHJiitsNUoEa9CFs04ivKmvg2FjEBRQ8CSC_PJtSD91ZkrvUi" # Webhook para notificações da equipe (ex: 10 min antes da pausa)
-DISCORD_WEBHOOK_GESTAO = "https://discord.com/api/webhooks/1452088104616722475/mIVeSKVD0mtLErmlTt5QqnQvYpDBEw7TpH7CdZB0A0H1Ms5iFWZqZdGmcRY78EpsJ_pI" # Webhook para notificações da gestão (ex: agendamento, início/fim de pausa)
+DISCORD_WEBHOOK_GESTAO = "https://discord.com/api/webhooks/1452088104616722475/mIVeSKVD0mtLErmlTt5QqnVpDBEw7TpH7CdZB0A0H1Ms5iFWZqZdGmcRY78EpsJ_pI" # Webhook para notificações da gestão (ex: agendamento, início/fim de pausa)
 SUPABASE_URL = "https://gzozqxrlgdzjrqfvdxzw.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6b3pxeHJsZ2R6anJxZnZkeHp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0OTg1MjIsImV4cCI6MjA4MjA3NDUyMn0.dLEjBPESUz5KnVwxqEMaMxoy65gsLqG2QdjK2xFTUhU"
 
@@ -161,6 +161,7 @@ if supabase:
                                 duracao = st.number_input(f"Duração (minutos) para {atendente_nome}:", 1, 120, 15, key=f"duracao_{atendente_email}")
                             with col2:
                                 # Define um horário padrão razoável, como 15 minutos a partir de agora
+                                # O st.time_input retorna um objeto datetime.time puro
                                 hora_sugestao = (get_now() + timedelta(minutes=15)).time()
                                 horario_agendado_input = st.time_input(f"Horário de início para {atendente_nome}:", value=hora_sugestao, key=f"horario_{atendente_email}")
 
@@ -169,15 +170,17 @@ if supabase:
                                 'email': atendente_email,
                                 'nome': atendente_nome,
                                 'duracao': duracao,
-                                'horario_agendado': horario_agendado_input
+                                'horario_agendado_time_obj': horario_agendado_input # Armazena o objeto time puro
                             })
 
                         submitted = st.form_submit_button("✅ AGENDAR PAUSAS SELECIONADAS", type="primary")
 
                         if submitted:
                             for agendamento in agendamentos:
-                                # Combina a data de hoje com o horário agendado
-                                data_hora_agendada = datetime.combine(get_now().date(), agendamento['horario_agendado'], tzinfo=TIMEZONE_SP)
+                                # --- CORREÇÃO AQUI: Criar o datetime com a data atual e o objeto time selecionado ---
+                                # Usamos get_now().date() para a data e o objeto time puro do input.
+                                # O tzinfo é aplicado aqui para garantir que o datetime esteja no fuso horário correto antes de ir para o Supabase.
+                                data_hora_agendada_com_tz = datetime.combine(get_now().date(), agendamento['horario_agendado_time_obj'], tzinfo=TIMEZONE_SP)
 
                                 # Insere a pausa com status 'Agendada' e 'notificacao_enviada' como False
                                 supabase.table('escalas').insert({
@@ -185,18 +188,20 @@ if supabase:
                                     'nome': agendamento['nome'],
                                     'duracao': agendamento['duracao'],
                                     'status': 'Agendada', # Novo status
-                                    'horario_agendado': data_hora_agendada.isoformat(), # Salva como ISO formatado
+                                    'horario_agendado': data_hora_agendada_com_tz.isoformat(), # Salva como ISO formatado no Supabase
                                     'notificacao_enviada': False # Novo campo
                                 }).execute()
-                                st.success(f"✅ Pausa agendada para {agendamento['nome']} às {agendamento['horario_agendado'].strftime('%H:%M')} por {agendamento['duracao']} minutos.")
 
-                                # --- LINHA DE NOTIFICAÇÃO DE AGENDAMENTO NO DISCORD ---
-                                # Usamos 'agendamento['horario_agendado']' diretamente para garantir que o horário exibido
-                                # seja o que o supervisor selecionou, sem interferência de fuso horário na string.
-                                enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🗓️ **{agendamento['nome']}** teve a pausa agendada para **{agendamento['horario_agendado'].strftime('%H:%M')}** por {agendamento['duracao']} minutos.")
-                                # --- FIM DA LINHA ---
+                                # --- MENSAGEM DE SUCESSO NO STREAMLIT ---
+                                # Usa o objeto time puro para a exibição no Streamlit
+                                st.success(f"✅ Pausa agendada para {agendamento['nome']} às {agendamento['horario_agendado_time_obj'].strftime('%H:%M')} por {agendamento['duracao']} minutos.")
 
-                            # --- CORREÇÃO: MOVIDO st.rerun() PARA FORA DO LOOP ---
+                                # --- NOTIFICAÇÃO DE AGENDAMENTO NO DISCORD ---
+                                # Também usa o objeto time puro para a exibição no Discord
+                                enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🗓️ **{agendamento['nome']}** teve a pausa agendada para **{agendamento['horario_agendado_time_obj'].strftime('%H:%M')}** por {agendamento['duracao']} minutos.")
+                                # --- FIM DA CORREÇÃO ---
+
+                            # --- st.rerun() MOVIDO PARA FORA DO LOOP (já estava assim na última versão) ---
                             st.rerun() # Recarrega para atualizar a lista de atendentes pendentes
 
             elif menu == "Histórico":
@@ -265,6 +270,7 @@ if supabase:
 
             if pausa_data:
                 # Se houver uma pausa agendada ou ativa, atualiza o session_state
+                # O 'horario_agendado' do Supabase é um ISO formatado, então convertemos para datetime
                 st.session_state.update({
                     "t_pausa": pausa_data['duracao'],
                     "p_id": pausa_data['id'],
@@ -291,6 +297,7 @@ if supabase:
 
                 # Exibe informações da pausa agendada/ativa
                 if pausa_data['status'] == 'Agendada' or pausa_data['status'] == 'Notificada':
+                    # Aqui usamos o horario_agendado do session_state, que já foi convertido do Supabase
                     st.info(f"⏳ Sua pausa está agendada para iniciar às **{st.session_state.horario_agendado.strftime('%H:%M')}** e terá duração de **{st.session_state.t_pausa} minutos**.")
 
                     # Calcula e exibe o tempo restante para o início da pausa
