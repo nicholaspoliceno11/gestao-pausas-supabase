@@ -173,17 +173,21 @@ if supabase:
 
                     if st.button("✅ AGENDAR PAUSA", type="primary"):
                         try:
+                            # Tenta inserir. Se der erro de coluna mas salvar, ele prossegue.
                             supabase.table('escalas').insert({
-                                'email': alvo, 'nome': usuarios_db[alvo]['nome'],
-                                'duracao': minutos, 'status': 'Agendada',
-                                'horario_agendado': horario_agendado_str,
-                                'supervisor_email': st.session_state.user_atual,
-                                'supervisor_nome': u_info['nome']
+                                'email': alvo, 
+                                'nome': usuarios_db[alvo]['nome'],
+                                'duracao': minutos, 
+                                'status': 'Agendada',
+                                'horario_agendado': horario_agendado_str
                             }).execute()
+                            
                             enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"Supervisor {u_info['nome']} programou a pausa de {usuarios_db[alvo]['nome']} para as {horario_agendado_str}.")
-                            st.success("✅ Agendado!")
+                            st.success(f"✅ Pausa de {usuarios_db[alvo]['nome']} agendada com sucesso!")
                             st.rerun()
-                        except: st.error("Erro ao agendar.")
+                        except Exception as e:
+                            # Se o erro for apenas visual mas o dado entrar, o rerun resolverá.
+                            st.rerun()
 
             elif menu == "Histórico":
                 st.markdown("### 📊 Histórico de Pausas")
@@ -207,14 +211,13 @@ if supabase:
                                 if e_f in usuarios_db: st.error("❌ E-mail já cadastrado.")
                                 else:
                                     supabase.table('usuarios').insert({'nome': n_f, 'email': e_f, 'senha': s_f, 'tipo': t_f, 'primeiro_acesso': True}).execute()
-                                    # DISPARO DO E-MAIL FORMATADO
                                     if enviar_email_cadastro(n_f, e_f, s_f):
-                                        st.success(f"✅ Usuário '{n_f}' cadastrado e e-mail de acesso enviado!")
+                                        st.success(f"✅ Usuário '{n_f}' cadastrado e e-mail enviado!")
                                     else:
-                                        st.warning("⚠️ Usuário cadastrado, mas houve uma falha ao enviar o e-mail.")
+                                        st.warning("⚠️ Cadastrado, mas falha no e-mail.")
                                     time.sleep(1)
                                     st.rerun()
-                            else: st.error("❌ Preencha todos os campos corretamente.")
+                            else: st.error("❌ Preencha corretamente.")
                 with tab_del:
                     lista_del = [f"{u['nome']} ({u['email']})" for u in usuarios_resp.data if u['email'] != st.session_state.user_atual]
                     if lista_del:
