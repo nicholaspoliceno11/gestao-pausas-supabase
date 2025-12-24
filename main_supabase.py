@@ -184,8 +184,8 @@ if supabase:
 
                                 st.success(f"✅ Pausa agendada para {agendamento['nome']} às {agendamento['horario_agendado_str']} por {agendamento['duracao']} minutos.")
 
-                                enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🗓️ **{agendamento['nome']}** teve a pausa agendada para **{agendamento['horario_agendado_str']}**.")
-                                enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🗓️ Supervisor **{u_info['nome']}** agendou a pausa de **{agendamento['nome']}** para **{agendamento['horario_agendado_str']}**.")
+                                enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🗓️ **{agendamento['nome']}** teve a pausa agendada para **{agendamento['horario_agendado_str']}**.")
+                                enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🗓️ Supervisor **{u_info['nome']}** agendou a pausa de **{agendamento['nome']}** para **{agendamento['horario_agendado_str']}**.")
 
                             st.rerun()
 
