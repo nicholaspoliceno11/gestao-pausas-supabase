@@ -196,7 +196,7 @@ if supabase:
                                 }).execute()
                                 st.success(f"✅ Pausa agendada para {atendentes_para_selecionar[selected_email]} às {horario_agendado_str} por {duracao_pausa} minutos.")
 
-                                # --- CORREÇÃO AQUI: Notificação de agendamento para o grupo SAC-QP (EQUIPE) ---
+                                # Notificação de agendamento para o grupo SAC-QP (EQUIPE)
                                 enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🗓️ Supervisor **{u_info['nome']}** agendou a pausa de **{atendentes_para_selecionar[selected_email]}** para **{horario_agendado_str}**.")
 
                                 st.rerun()
@@ -340,9 +340,10 @@ if supabase:
                     else:
                         st.markdown("**Aguardando início...**")
 
-                    if st.button("🚀 INICIAR PAUSA AGORA", use_container_width=True, type="primary'):
+                    # --- CORREÇÃO AQUI: Aspas duplas para o argumento type ---
+                    if st.button("🚀 INICIAR PAUSA AGORA", use_container_width=True, type="primary"):
                         st.session_state.saida = get_now().strftime("%H:%M:%S")
-                        # --- CORREÇÃO AQUI: Definir st.session_state.fim ANTES do rerun ---
+                        # Definir st.session_state.fim ANTES do rerun
                         st.session_state.fim = (get_now() + timedelta(minutes=st.session_state.t_pausa)).timestamp() * 1000
                         supabase.table('escalas').update({'status': 'Em Pausa', 'inicio': st.session_state.saida}).eq('id', st.session_state.p_id).execute()
                         # Notificação de início de pausa para o grupo de Gestão
@@ -351,7 +352,7 @@ if supabase:
 
                 elif pausa_data['status'] == 'Em Pausa':
                     st.warning(f"⏳ Pausa ativa! Retorno previsto em {st.session_state.t_pausa} minutos.")
-                    # --- CORREÇÃO AQUI: Recalcular 'fim' se não estiver no session_state (após um rerun, por exemplo) ---
+                    # Recalcular 'fim' se não estiver no session_state (após um rerun, por exemplo)
                     if 'fim' not in st.session_state or st.session_state.fim == 0:
                         # Se a pausa já está 'Em Pausa' e 'fim' não está definido, tenta calcular a partir do 'inicio'
                         if pausa_data.get('inicio'):
