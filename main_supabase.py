@@ -117,9 +117,10 @@ if supabase:
             st.rerun()
 
         if any(x in cargo for x in ["supervisor", "administrador"]):
-            st.sidebar.markdown("---")
-            st.sidebar.markdown("### ⚙️ Funções de Gestão")
-            menu = st.sidebar.radio("Escolha uma opção:", ["Agendar Pausa", "Histórico de Pausas", "Correções"], key="menu_supervisor")
+            # --- ALTERAÇÃO AQUI: st.radio movido para a área principal ---
+            menu = st.radio("Ações:", ["Agendar Pausa", "Histórico de Pausas", "Gestão de Equipe", "Correções"], horizontal=True)
+            st.divider()
+            # --- FIM DA ALTERAÇÃO ---
 
             if menu == "Agendar Pausa":
                 st.markdown("### 🗓️ Agendar Pausa para Atendente")
@@ -155,9 +156,7 @@ if supabase:
 
                             duracao = st.number_input(f"Duração da pausa (minutos) para {atendente_nome}:", min_value=5, max_value=60, value=15, key=f"duracao_{atendente_email}")
 
-                            # --- ALTERAÇÃO AQUI: st.text_input para horário ---
                             horario_agendado_str = st.text_input(f"Horário de início (HH:MM) para {atendente_nome}:", value="00:00", key=f"horario_{atendente_email}")
-                            # --- FIM DA ALTERAÇÃO ---
 
                             agendamentos.append({
                                 'email': atendente_email,
@@ -233,6 +232,37 @@ if supabase:
                     else:
                         st.info("Nenhuma pausa registrada para esta data.")
 
+            # --- ALTERAÇÃO AQUI: Reintrodução do menu "Gestão de Equipe" ---
+            elif menu == "Gestão de Equipe":
+                st.markdown("### 👥 Gestão de Equipe")
+                tab_add, tab_del = st.tabs(["➕ Adicionar Usuário", "🗑️ Remover Usuário"])
+                with tab_add:
+                    with st.form("add_user"):
+                        n_f = st.text_input("Nome*"); e_f = st.text_input("E-mail*").lower().strip(); s_f = st.text_input("Senha Temporária*")
+                        t_f = st.selectbox("Perfil de Acesso*", ["atendente sac", "supervisor", "administrador"])
+                        if st.form_submit_button("💾 SALVAR"):
+                            if n_f and e_f and s_f:
+                                supabase.table('usuarios').insert({'nome': n_f, 'email': e_f, 'senha': s_f, 'tipo': t_f, 'primeiro_acesso': True}).execute()
+                                st.success("✅ Cadastrado!")
+                                st.rerun()
+                            else:
+                                st.error("Por favor, preencha todos os campos obrigatórios.")
+                with tab_del:
+                    lista_del = [f"{u['nome']} ({u['email']})" for u in usuarios_resp.data if u['email'] != st.session_state.user_atual]
+                    if lista_del:
+                        sel_del = st.selectbox("Selecione quem remover:", lista_del)
+                        email_final = sel_del.split('(')[-1].replace(')', '')
+                        cod_del = st.text_input("Código Mestre p/ Deletar:", type="password", key="del_cod")
+                        if st.button("🗑️ REMOVER"):
+                            if cod_del == CODIGO_MESTRE_GESTAO:
+                                supabase.table('usuarios').delete().eq('email', email_final).execute()
+                                st.success("✅ Usuário removido!")
+                                st.rerun()
+                            else: st.error("❌ Código incorreto.")
+                    else:
+                        st.info("Nenhum usuário para remover (exceto você mesmo).")
+            # --- FIM DA ALTERAÇÃO ---
+
             elif menu == "Correções":
                 st.markdown("### 🛠️ Correções e Destravamento")
                 st.warning("Use esta seção com cautela. Ações aqui podem afetar o registro de pausas.")
@@ -273,7 +303,7 @@ if supabase:
                 st.session_state.p_id = pausa_data['id']
                 st.session_state.t_pausa = pausa_data['duracao']
 
-                # --- ALTERAÇÃO AQUI: Leitura do horário como string e conversão para cálculo ---
+                # --- Leitura do horário como string e conversão para cálculo ---
                 st.session_state.horario_agendado_str = pausa_data['horario_agendado'] # String do horário para exibição
 
                 # Para cálculos de tempo (10 minutos antes, etc.), usamos o campo 'horario_agendado_dt_utc'
