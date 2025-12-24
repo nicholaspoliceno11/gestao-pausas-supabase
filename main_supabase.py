@@ -1,6 +1,6 @@
 import streamlit as st
 from supabase import create_client, Client
-from datetime import datetime, timedelta, date, time # Importar time explicitamente
+from datetime import datetime, timedelta, date, time
 import pandas as pd
 import pytz
 import requests
@@ -83,7 +83,7 @@ if supabase:
     try:
         usuarios_resp = supabase.table('usuarios').select('*').execute()
         usuarios_db = {u['email'].lower(): u for u in usuarios_resp.data}
-    except Exception as e: # Captura o erro para depuração
+    except Exception as e:
         st.error(f"❌ Erro ao conectar com banco de dados ou carregar usuários: {e}")
         st.stop()
 
@@ -116,18 +116,19 @@ if supabase:
             st.session_state.clear()
             st.rerun()
 
-        if any(x in cargo for x in ["supervisor", "administrador"]):
-            # --- ALTERAÇÃO AQUI: st.radio movido para a área principal ---
+        if any(x in cargo for x in ['admin', 'supervisor', 'gestão']):
+            # --- CORREÇÃO AQUI: Menu de ações na área principal, com "Gestão de Equipe" de volta ---
             menu = st.radio("Ações:", ["Agendar Pausa", "Histórico de Pausas", "Gestão de Equipe", "Correções"], horizontal=True)
             st.divider()
-            # --- FIM DA ALTERAÇÃO ---
+            # --- FIM DA CORREÇÃO ---
 
             if menu == "Agendar Pausa":
                 st.markdown("### 🗓️ Agendar Pausa para Atendente")
 
                 # Obter todos os atendentes
-                todos_atendentes_resp = supabase.table('usuarios').select('email, nome').eq('tipo', 'Atendente').execute()
-                todos_atendentes = {u['email'].lower(): u for u in todos_atendentes_resp.data}
+                # Garante que estamos buscando usuários com tipo 'atendente' (case-insensitive)
+                todos_atendentes_resp = supabase.table('usuarios').select('email, nome, tipo').execute()
+                todos_atendentes_filtrados = {u['email'].lower(): u for u in todos_atendentes_resp.data if 'atendente' in u['tipo'].lower()}
 
                 # Obter pausas finalizadas hoje
                 hoje_iso = get_now().date().isoformat()
@@ -140,7 +141,7 @@ if supabase:
 
                 # Atendentes que ainda precisam tirar pausa (não finalizaram e não têm ativa/agendada)
                 at_list_pendentes = [
-                    e for e, i in todos_atendentes.items() 
+                    e for e, i in todos_atendentes_filtrados.items() 
                     if e not in emails_com_pausa_finalizada_hoje and e not in emails_com_pausa_ativa_ou_agendada
                 ]
 
@@ -151,7 +152,7 @@ if supabase:
                     agendamentos = []
                     with st.form("form_agendar_pausas"):
                         for atendente_email in at_list_pendentes:
-                            atendente_nome = todos_atendentes[atendente_email]['nome']
+                            atendente_nome = todos_atendentes_filtrados[atendente_email]['nome']
                             st.subheader(f"Para: {atendente_nome}")
 
                             duracao = st.number_input(f"Duração da pausa (minutos) para {atendente_nome}:", min_value=5, max_value=60, value=15, key=f"duracao_{atendente_email}")
@@ -162,7 +163,7 @@ if supabase:
                                 'email': atendente_email,
                                 'nome': atendente_nome,
                                 'duracao': duracao,
-                                'horario_agendado_str': horario_agendado_str # Armazena a string do horário
+                                'horario_agendado_str': horario_agendado_str
                             })
                             st.markdown("---")
 
@@ -170,41 +171,30 @@ if supabase:
 
                         if submitted:
                             for agendamento in agendamentos:
-                                # --- VALIDAÇÃO DO FORMATO DO HORÁRIO ---
                                 try:
-                                    # Tenta converter a string para um objeto time para validação e cálculos internos
                                     horario_agendado_time_obj = datetime.strptime(agendamento['horario_agendado_str'], '%H:%M').time()
                                 except ValueError:
                                     st.error(f"❌ Formato de horário inválido para {agendamento['nome']}. Use HH:MM (ex: 21:30).")
-                                    continue # Pula para o próximo agendamento se o formato for inválido
-                                # --- FIM DA VALIDAÇÃO ---
+                                    continue
 
-                                # Combina a data de hoje com o horário agendado para criar um datetime com fuso horário para cálculos
-                                # Isso é para a lógica de "10 minutos antes" funcionar, não para exibição.
                                 data_hora_agendada_para_calculo = datetime.combine(get_now().date(), horario_agendado_time_obj, tzinfo=TIMEZONE_SP)
 
-                                # Insere a pausa com status 'Agendada' e 'notificacao_enviada' como False
-                                # O 'horario_agendado' no Supabase agora é a string exata digitada.
                                 supabase.table('escalas').insert({
                                     'email': agendamento['email'],
                                     'nome': agendamento['nome'],
                                     'duracao': agendamento['duracao'],
                                     'status': 'Agendada',
-                                    'horario_agendado': agendamento['horario_agendado_str'], # Salva a string do horário
-                                    'horario_agendado_dt_utc': data_hora_agendada_para_calculo.astimezone(pytz.utc).isoformat(), # NOVO: Salva o datetime em UTC para cálculos
+                                    'horario_agendado': agendamento['horario_agendado_str'],
+                                    'horario_agendado_dt_utc': data_hora_agendada_para_calculo.astimezone(pytz.utc).isoformat(),
                                     'notificacao_enviada': False
                                 }).execute()
 
                                 st.success(f"✅ Pausa agendada para {agendamento['nome']} às {agendamento['horario_agendado_str']} por {agendamento['duracao']} minutos.")
 
-                                # --- NOTIFICAÇÕES DISCORD DE AGENDAMENTO ---
-                                # Para a equipe (SAC-QP)
                                 enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🗓️ **{agendamento['nome']}** teve a pausa agendada para **{agendamento['horario_agendado_str']}**.")
-                                # Para a gestão (Supervisor)
                                 enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🗓️ Supervisor **{u_info['nome']}** agendou a pausa de **{agendamento['nome']}** para **{agendamento['horario_agendado_str']}**.")
-                                # --- FIM DAS NOTIFICAÇÕES DISCORD DE AGENDAMENTO ---
 
-                            st.rerun() # Recarrega para atualizar a lista de atendentes pendentes
+                            st.rerun()
 
             elif menu == "Histórico de Pausas":
                 st.markdown("### 📊 Histórico de Pausas")
@@ -232,7 +222,7 @@ if supabase:
                     else:
                         st.info("Nenhuma pausa registrada para esta data.")
 
-            # --- ALTERAÇÃO AQUI: Reintrodução do menu "Gestão de Equipe" ---
+            # --- CORREÇÃO AQUI: Menu "Gestão de Equipe" de volta ---
             elif menu == "Gestão de Equipe":
                 st.markdown("### 👥 Gestão de Equipe")
                 tab_add, tab_del = st.tabs(["➕ Adicionar Usuário", "🗑️ Remover Usuário"])
@@ -261,13 +251,12 @@ if supabase:
                             else: st.error("❌ Código incorreto.")
                     else:
                         st.info("Nenhum usuário para remover (exceto você mesmo).")
-            # --- FIM DA ALTERAÇÃO ---
+            # --- FIM DA CORREÇÃO ---
 
             elif menu == "Correções":
                 st.markdown("### 🛠️ Correções e Destravamento")
                 st.warning("Use esta seção com cautela. Ações aqui podem afetar o registro de pausas.")
 
-                # Buscar pausas ativas ou agendadas para destravar
                 pausas_pendentes_resp = supabase.table('escalas').select('*').in_('status', ['Agendada', 'Notificada', 'Em Pausa']).execute()
                 pausas_pendentes = pausas_pendentes_resp.data
 
@@ -294,7 +283,6 @@ if supabase:
             st.markdown(f"### Olá, {u_info.get('nome')}!")
             st.markdown("---")
 
-            # Buscar pausa agendada ou ativa para o atendente
             pausa_ativa_resp = supabase.table('escalas').select('*').eq('email', st.session_state.user_atual).in_('status', ['Agendada', 'Notificada', 'Em Pausa']).limit(1).execute()
             pausa_data = pausa_ativa_resp.data[0] if pausa_ativa_resp.data else None
 
@@ -303,31 +291,32 @@ if supabase:
                 st.session_state.p_id = pausa_data['id']
                 st.session_state.t_pausa = pausa_data['duracao']
 
-                # --- Leitura do horário como string e conversão para cálculo ---
-                st.session_state.horario_agendado_str = pausa_data['horario_agendado'] # String do horário para exibição
+                st.session_state.horario_agendado_str = pausa_data['horario_agendado']
 
                 # Para cálculos de tempo (10 minutos antes, etc.), usamos o campo 'horario_agendado_dt_utc'
                 # Convertemos de UTC para o fuso horário de SP
-                horario_agendado_dt_utc = datetime.fromisoformat(pausa_data['horario_agendado_dt_utc'])
-                horario_agendado_dt_sp = horario_agendado_dt_utc.astimezone(TIMEZONE_SP)
-                st.session_state.horario_agendado_dt = horario_agendado_dt_sp # Armazena o datetime para cálculos
-                # --- FIM DA ALTERAÇÃO ---
+                # --- CORREÇÃO AQUI: Tratamento de erro para horario_agendado_dt_utc ---
+                try:
+                    horario_agendado_dt_utc = datetime.fromisoformat(pausa_data['horario_agendado_dt_utc'])
+                    horario_agendado_dt_sp = horario_agendado_dt_utc.astimezone(TIMEZONE_SP)
+                    st.session_state.horario_agendado_dt = horario_agendado_dt_sp
+                except (ValueError, TypeError):
+                    st.error("❌ Erro: Horário agendado para cálculo inválido no banco de dados. Contate a gestão.")
+                    st.stop()
+                # --- FIM DA CORREÇÃO ---
 
                 if pausa_data['status'] in ['Agendada', 'Notificada']:
-                    # Lógica de notificação de 10 minutos antes
                     agora = get_now()
                     tempo_para_pausa = st.session_state.horario_agendado_dt - agora
 
-                    # Se faltam 10 minutos ou menos E a notificação ainda não foi enviada
                     if timedelta(minutes=0) <= tempo_para_pausa <= timedelta(minutes=10) and not pausa_data['notificacao_enviada']:
                         enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🔔 **{u_info['nome']}**, sua pausa foi liberada! Início agendado para **{st.session_state.horario_agendado_str}**.")
                         supabase.table('escalas').update({'status': 'Notificada', 'notificacao_enviada': True}).eq('id', st.session_state.p_id).execute()
                         st.success(f"🔔 Notificação enviada! Sua pausa está agendada para **{st.session_state.horario_agendado_str}**.")
-                        st.rerun() # Recarrega para atualizar o status
+                        st.rerun()
 
                     st.info(f"🗓️ Sua pausa está agendada para **{st.session_state.horario_agendado_str}** por {st.session_state.t_pausa} minutos.")
 
-                    # Contagem regressiva para o início da pausa
                     if tempo_para_pausa > timedelta(minutes=0):
                         minutos_restantes = int(tempo_para_pausa.total_seconds() // 60)
                         segundos_restantes = int(tempo_para_pausa.total_seconds() % 60)
@@ -337,9 +326,8 @@ if supabase:
 
                     if st.button("🚀 INICIAR PAUSA AGORA", use_container_width=True, type="primary"):
                         st.session_state.saida = get_now().strftime("%H:%M:%S")
-                        st.session_state.fim = (get_now() + timedelta(minutes=st.session_state.t_pausa)).timestamp() * 1000 # Timestamp em ms
+                        st.session_state.fim = (get_now() + timedelta(minutes=st.session_state.t_pausa)).timestamp() * 1000
                         supabase.table('escalas').update({'status': 'Em Pausa', 'inicio': st.session_state.saida}).eq('id', st.session_state.p_id).execute()
-                        # --- NOTIFICAÇÃO DE INÍCIO DE PAUSA NO DISCORD (GRUPO GESTÃO) ---
                         enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🚀 **{u_info['nome']}** INICIOU a pausa.")
                         st.rerun()
 
@@ -412,7 +400,6 @@ if supabase:
                             'duracao': st.session_state.t_pausa
                         }).execute()
                         supabase.table('escalas').delete().eq('id', st.session_state.p_id).execute()
-                        # Notificação para o grupo de Gestão (Supervisor)
                         enviar_discord(DISCORD_WEBHOOK_GESTAO, f"✅ **{u_info['nome']}** FINALIZOU a pausa.")
                         st.session_state.pausa_ativa = False
                         st.rerun()
