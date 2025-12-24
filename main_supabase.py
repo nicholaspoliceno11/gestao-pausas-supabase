@@ -176,7 +176,7 @@ if supabase:
                                 # Criar um objeto time para combinar com a data
                                 horario_obj = time(hora, minuto)
                             except ValueError:
-                                st.error("❌ Formato de horário inválido. Use HH:MM (ex: 21:30).")
+                                st.error(f"❌ Formato de horário inválido. Use HH:MM (ex: 21:30).")
                                 st.stop()
 
                             # Criar datetime com fuso horário para cálculos internos
