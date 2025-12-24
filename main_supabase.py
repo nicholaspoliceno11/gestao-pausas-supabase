@@ -14,7 +14,7 @@ from email.mime.multipart import MIMEMultipart
 GMAIL_USER = "gestao.queropassagem@gmail.com"
 GMAIL_PASSWORD = "pakiujauoxbmihyy"
 DISCORD_WEBHOOK_EQUIPE = "https://discord.com/api/webhooks/1452314030357348353/-ty01Mp6tabaM4U9eICtKHJiitsNUoEa9CFs04ivKmvg2FjEBRQ8CSC_PJtSD91ZkrvUi" # Webhook para notificações da equipe (ex: 10 min antes da pausa)
-DISCORD_WEBHOOK_GESTAO = "https://discord.com/api/webhooks/1452088104616722475/mIVeSKVD0mtLErmlTt5QqnVpDBEw7TpH7CdZB0A0H1Ms5iFWZqZdGmcRY78EpsJ_pI" # Webhook para notificações da gestão (ex: agendamento, início/fim de pausa)
+DISCORD_WEBHOOK_GESTAO = "https://discord.com/api/webhooks/1452088104616722475/mIVeSKVD0mtLErmlTt5QqnQvYpDBEw7TpH7CdZB0A0H1Ms5iFWZqZdGmcRY78EpsJ_pI" # Webhook para notificações da gestão (ex: agendamento, início/fim de pausa)
 SUPABASE_URL = "https://gzozqxrlgdzjrqfvdxzw.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6b3pxeHJsZ2R6anJxZnZkeHp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0OTg1MjIsImV4cCI6MjA4MjA3NDUyMn0.dLEjBPESUz5KnVwxqEMaMxoy65gsLqG2QdjK2xFTUhU"
 
@@ -132,7 +132,7 @@ if supabase:
                 emails_com_pausa_finalizada_hoje = {item['email'] for item in historico_hoje_resp.data}
 
                 # Pausas ativas ou agendadas (não finalizadas)
-                escalas_ativas_resp = supabase.table('escalas').select('email').neq('status', 'Finalizada').execute()
+                escalas_ativas_resp = supabase.table('escalas').select('email').or_('status.eq.Agendada,status.eq.Notificada,status.eq.Em Pausa').execute()
                 emails_com_pausa_ativa_ou_agendada = {item['email'] for item in escalas_ativas_resp.data}
 
                 # Lista de todos os atendentes
@@ -254,7 +254,7 @@ if supabase:
                     cod_un = st.text_input("Código Mestre:", type="password", key="un_cod")
                     if st.button("🔓 DESTRAVAR"):
                         if cod_un == CODIGO_MESTRE_GESTAO:
-                            supabase.table('escalas').delete().eq('email', email_para_destravar).execute()
+                            supabase.table('escalas').delete().eq('id', email_para_destravar).execute()
                             st.success("✅ Destravado!")
                             st.rerun()
                         else: st.error("❌ Código incorreto.")
@@ -271,12 +271,20 @@ if supabase:
             if pausa_data:
                 # Se houver uma pausa agendada ou ativa, atualiza o session_state
                 # O 'horario_agendado' do Supabase é um ISO formatado, então convertemos para datetime
+                # É CRUCIAL que esta conversão de fromisoformat seja feita com o fuso horário correto.
+                # Se o Supabase armazena em UTC, precisamos converter de UTC para TIMEZONE_SP.
+                horario_agendado_from_db = datetime.fromisoformat(pausa_data['horario_agendado'])
+                if horario_agendado_from_db.tzinfo is None: # Se não tem fuso horário, assume UTC e converte
+                    horario_agendado_from_db = pytz.utc.localize(horario_agendado_from_db).astimezone(TIMEZONE_SP)
+                else: # Se já tem fuso horário, apenas converte para TIMEZONE_SP
+                    horario_agendado_from_db = horario_agendado_from_db.astimezone(TIMEZONE_SP)
+
                 st.session_state.update({
                     "t_pausa": pausa_data['duracao'],
                     "p_id": pausa_data['id'],
                     "liberado": True, # Considera liberado se já está agendada ou em pausa
                     "pausa_ativa": pausa_data['status'] == 'Em Pausa',
-                    "horario_agendado": datetime.fromisoformat(pausa_data['horario_agendado']) if pausa_data['horario_agendado'] else None
+                    "horario_agendado": horario_agendado_from_db # Usa o datetime convertido
                 })
 
                 # Lógica para notificação de 10 minutos antes
