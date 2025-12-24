@@ -26,8 +26,20 @@ def get_now():
     return datetime.now(TIMEZONE_SP)
 
 def enviar_discord(webhook_url, mensagem):
-    try: requests.post(webhook_url, json={"content": mensagem}, timeout=5)
-    except: pass
+    try:
+        # Prints para depuração: Verifique o terminal/logs do Streamlit
+        print(f"DEBUG: Tentando enviar para Discord. Webhook: {webhook_url}, Mensagem: {mensagem}")
+        response = requests.post(webhook_url, json={"content": mensagem}, timeout=5)
+        response.raise_for_status() # Levanta um erro para códigos de status HTTP ruins (4xx ou 5xx)
+        print(f"DEBUG: Discord enviado com sucesso! Status: {response.status_code}")
+    except requests.exceptions.Timeout:
+        print(f"ERRO: Tempo limite excedido ao enviar para Discord ({webhook_url}).")
+    except requests.exceptions.RequestException as e:
+        print(f"ERRO: Falha na requisição HTTP ao enviar para Discord ({webhook_url}): {e}")
+        if e.response is not None:
+            print(f"ERRO: Resposta do Discord: {e.response.text}")
+    except Exception as e:
+        print(f"ERRO: Erro inesperado ao enviar para Discord ({webhook_url}): {e}")
 
 def gerar_csv(df):
     return df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
@@ -167,20 +179,21 @@ if supabase:
                             # Inserir na tabela de escalas com status 'Agendada' e o horário definido
                             supabase.table('escalas').insert({
                                 'email': alvo,
-                                'nome': usuarios_db[alvo]['nome'], # Usando 'nome'
+                                'nome': usuarios_db[alvo]['nome'],
                                 'duracao': minutos,
-                                'status': 'Agendada', # Novo status
-                                'horario_agendado': horario_agendado_str, # Salva como string HH:MM
-                                'supervisor_email': st.session_state.user_atual, # CORRIGIDO: Usando 'supervisor_email'
-                                'supervisor_nome': u_info['nome'] # CORRIGIDO: Usando 'supervisor_nome'
+                                'status': 'Agendada',
+                                'horario_agendado': horario_agendado_str,
+                                'supervisor_email': st.session_state.user_atual,
+                                'supervisor_nome': u_info['nome']
                             }).execute()
 
                             # Alerta de agendamento de pausa para o Discord (formato específico)
                             mensagem_agendamento = f"Supervisor {u_info['nome']} programou a pausa do Atendente {usuarios_db[alvo]['nome']} para as {horario_agendado_str}."
-                            enviar_discord(DISCORD_WEBHOOK_EQUIPE, mensagem_agendamento) # Enviando para o webhook EQUIPE
+                            print(f"DEBUG: Chamando enviar_discord para agendamento: {mensagem_agendamento}") # DEBUG
+                            enviar_discord(DISCORD_WEBHOOK_EQUIPE, mensagem_agendamento)
 
                             st.success(f"✅ Pausa agendada para {usuarios_db[alvo]['nome']} às {horario_agendado_str} com duração de {minutos} minutos!")
-                            st.rerun() # Recarrega para atualizar a lista de atendentes disponíveis
+                            st.rerun()
                         except ValueError:
                             st.error("❌ Formato de horário inválido. Use HH:MM (ex: 09:30).")
                         except Exception as ex:
@@ -212,13 +225,13 @@ if supabase:
                                     try:
                                         supabase.table('usuarios').insert({'nome': n_f, 'email': e_f, 'senha': s_f, 'tipo': t_f, 'primeiro_acesso': True}).execute()
                                         st.success(f"✅ Usuário '{n_f}' cadastrado com sucesso como '{t_f}'. Ele precisará trocar a senha no primeiro acesso.")
-                                        st.rerun() # Recarrega para atualizar a lista de usuários
+                                        st.rerun()
                                     except Exception as ex:
                                         st.error(f"❌ Erro ao cadastrar usuário: {ex}")
                             else:
                                 st.error("❌ Por favor, preencha todos os campos e certifique-se de que a senha tenha pelo menos 6 caracteres.")
                 with tab_del:
-                    lista_del = [f"{u['nome']} ({u['email']})" for u in usuarios_resp.data if u['email'] != st.session_state.user_atual] # Usando 'nome'
+                    lista_del = [f"{u['nome']} ({u['email']})" for u in usuarios_resp.data if u['email'] != st.session_state.user_atual]
                     if lista_del:
                         sel_del = st.selectbox("Selecione o usuário para remover:", lista_del)
                         email_final = sel_del.split('(')[-1].replace(')', '')
@@ -228,7 +241,7 @@ if supabase:
                                 try:
                                     supabase.table('usuarios').delete().eq('email', email_final).execute()
                                     st.success(f"✅ Usuário '{sel_del.split('(')[0].strip()}' removido com sucesso.")
-                                    st.rerun() # Recarrega para atualizar a lista de usuários
+                                    st.rerun()
                                 except Exception as ex:
                                     st.error(f"❌ Erro ao remover usuário: {ex}")
                             else: st.error("❌ Código mestre incorreto.")
@@ -237,15 +250,13 @@ if supabase:
 
             elif menu == "Correções":
                 st.markdown("### ⚠️ Destravar Funcionário")
-                # Busca todas as pausas ativas, independentemente do status
                 esc_resp = supabase.table('escalas').select('*').execute()
                 if esc_resp.data:
-                    sel_un = st.selectbox("Pausa ativa:", [f"{x['nome']} ({x['email']}) - Status: {x['status']}" for x in esc_resp.data]) # Usando 'nome'
+                    sel_un = st.selectbox("Pausa ativa:", [f"{x['nome']} ({x['email']}) - Status: {x['status']}" for x in esc_resp.data])
                     cod_un = st.text_input("Código Mestre:", type="password", key="un_cod")
                     if st.button("🔓 DESTRAVAR"):
                         if cod_un == CODIGO_MESTRE_GESTAO:
                             try:
-                                # Deleta a pausa da tabela 'escalas'
                                 supabase.table('escalas').delete().eq('email', sel_un.split('(')[-1].split(')')[0]).execute()
                                 st.success(f"✅ Atendente '{sel_un.split('(')[0].strip()}' destravado com sucesso.")
                                 st.rerun()
@@ -260,7 +271,7 @@ if supabase:
 
             if 'pausa_ativa' not in st.session_state:
                 st.session_state.pausa_ativa = False
-            if 'pausa_agendada_info' not in st.session_state: # Renomeado para evitar conflito e ser mais descritivo
+            if 'pausa_agendada_info' not in st.session_state:
                 st.session_state.pausa_agendada_info = None
 
             # Verifica se já existe uma pausa "Em Pausa" para o usuário
@@ -271,34 +282,31 @@ if supabase:
                     "t_pausa": res_em_pausa.data[0]['duracao'],
                     "p_id": res_em_pausa.data[0]['id'],
                     "pausa_ativa": True,
-                    "saida": res_em_pausa.data[0].get('h_saida', get_now().strftime("%H:%M:%S")), # Tenta pegar a hora de saída se existir
+                    "saida": res_em_pausa.data[0].get('h_saida', get_now().strftime("%H:%M:%S")),
                     "fim": (get_now() + timedelta(minutes=res_em_pausa.data[0]['duracao'])).timestamp() * 1000
                 })
                 st.warning("⚠️ Sua pausa estava ativa e foi restaurada. Por favor, finalize-a se já retornou.")
-                st.rerun() # Recarrega para exibir o timer
+                st.rerun()
 
             # Se não há pausa ativa, verifica se há uma pausa agendada
             if not st.session_state.pausa_ativa:
                 res_agendada = supabase.table('escalas').select('*').eq('email', st.session_state.user_atual).eq('status', 'Agendada').execute()
                 if res_agendada.data:
                     pausa_agendada_info = res_agendada.data[0]
-                    st.session_state.pausa_agendada_info = pausa_agendada_info # Armazena a info completa da pausa agendada
+                    st.session_state.pausa_agendada_info = pausa_agendada_info
 
                     st.info(f"✅ Pausa autorizada: {pausa_agendada_info['duracao']} minutos. Agendada para as {pausa_agendada_info['horario_agendado']}.")
 
-                    # O botão "VERIFICAR MINHA LIBERAÇÃO" agora apenas confirma a informação
                     if st.button("🔄 VERIFICAR MINHA LIBERAÇÃO", use_container_width=True, type="primary"):
                         st.session_state.update({
                             "t_pausa": pausa_agendada_info['duracao'],
                             "p_id": pausa_agendada_info['id'],
-                            "liberado": True # Marca como liberado para poder iniciar
+                            "liberado": True
                         })
                         st.success(f"✅ Pausa autorizada: {st.session_state.t_pausa} minutos, agendada para as {pausa_agendada_info['horario_agendado']}!")
-                        # Não precisa de rerun aqui, pois a informação já foi exibida e o botão de iniciar aparecerá.
 
-                else: # Nenhuma pausa agendada ou em pausa
+                else:
                     st.info("⏳ Nenhuma pausa agendada para você no momento. Aguardando liberação da gestão...")
-                    # Botão para verificar liberação (se não houver agendamento, apenas informa)
                     if st.button("🔄 VERIFICAR MINHA LIBERAÇÃO", use_container_width=True, type="primary"):
                         st.info("⏳ Nenhuma pausa agendada para você no momento. Aguardando liberação da gestão...")
 
@@ -308,13 +316,11 @@ if supabase:
                     agora_hora = get_now().time()
                     horario_agendado_obj = datetime.strptime(st.session_state.pausa_agendada_info['horario_agendado'], "%H:%M").time()
 
-                    # Alerta se estiver iniciando antes do horário agendado
                     if agora_hora < horario_agendado_obj:
                         st.warning(f"⚠️ Você está iniciando a pausa **antes** do horário agendado ({st.session_state.pausa_agendada_info['horario_agendado']}).")
 
                     if st.button("🚀 INICIAR PAUSA AGORA", use_container_width=True):
                         hora_saida = get_now().strftime("%H:%M:%S")
-                        # Atualiza o status e registra a hora de saída na tabela 'escalas'
                         supabase.table('escalas').update({'status': 'Em Pausa', 'h_saida': hora_saida}).eq('id', st.session_state.p_id).execute()
                         st.session_state.update({
                             "pausa_ativa": True,
@@ -324,6 +330,7 @@ if supabase:
 
                         # Alerta de início de pausa para o Discord (formato específico)
                         mensagem_inicio = f"Atendente {u_info['nome']} iniciou a pausa."
+                        print(f"DEBUG: Chamando enviar_discord para INÍCIO de pausa: {mensagem_inicio}") # DEBUG
                         enviar_discord(DISCORD_WEBHOOK_SAC_QP, mensagem_inicio) # Enviando para o webhook sac-qp
                         st.rerun()
             else: # Pausa está ativa (timer rodando)
@@ -396,11 +403,12 @@ if supabase:
 
                     # Alerta de finalização de pausa para o Discord (formato específico)
                     mensagem_fim = f"Atendente {u_info['nome']} finalizou a pausa."
-                    enviar_discord(DISCORD_WEBHOOK_SAC_QP, mensagem_fim) # Enviando para o webhook sac-qp
+                    print(f"DEBUG: Chamando enviar_discord para FINALIZAÇÃO de pausa: {mensagem_fim}") # DEBUG
+                    enviar_discord(DISCORD_WEBHOOK_SAC_QP, mensagem_fim)
 
                     st.session_state.pausa_ativa = False
-                    st.session_state.liberado = False # Reseta o estado de liberação
-                    st.session_state.pausa_agendada_info = None # Reseta a pausa agendada
+                    st.session_state.liberado = False
+                    st.session_state.pausa_agendada_info = None
                     st.rerun()
 
 else: st.error("Erro de conexão com o Supabase. Por favor, verifique as configurações ou sua conexão com a internet.")
