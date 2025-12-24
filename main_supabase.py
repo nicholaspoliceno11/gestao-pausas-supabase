@@ -417,7 +417,6 @@ if supabase:
                             'duracao': st.session_state.t_pausa
                         }).execute()
                         supabase.table('escalas').delete().eq('id', st.session_state.p_id).execute()
-                        # --- CORREÇÃO AQUI: Notificação de fim de pausa para o grupo de Gestão ---
                         enviar_discord(DISCORD_WEBHOOK_GESTAO, f"✅ **{u_info['nome']}** FINALIZOU a pausa às {get_now().strftime('%H:%M')}.")
                         st.session_state.pausa_ativa = False
                         st.rerun()
