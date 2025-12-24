@@ -13,8 +13,8 @@ import time # Importar o módulo time para usar sleep
 # --- CONFIGURAÇÕES ---
 GMAIL_USER = "gestao.queropassagem@gmail.com"
 GMAIL_PASSWORD = "pakiujauoxbmihyy"
-DISCORD_WEBHOOK_EQUIPE = "https://discord.com/api/webhooks/1452314030357348353/-ty01Mp6tabaM4U9eICtKHJiitsNUoEa9CFs04ivKmvg2FjEBRQ8CSC_PJtSD91ZkrvUi" # Verifique se este webhook é para a equipe
-DISCORD_WEBHOOK_GESTAO = "https://discord.com/api/webhooks/1452088104616722475/mIVeSKVD0mtLErmlTt5QqnQvYpDBEw7TpH7CdZB0A0H1Ms5iFWZqZdGmcRY78EpsJ_pI" # Verifique se este webhook é para a gestão
+DISCORD_WEBHOOK_EQUIPE = "https://discord.com/api/webhooks/1452314030357348353/-ty01Mp6tabaM4U9eICtKHJiitsNUoEa9CFs04ivKmvg2FjEBRQ8CSC_PJtSD91ZkrvUi" # Webhook para notificações da equipe (ex: 10 min antes da pausa)
+DISCORD_WEBHOOK_GESTAO = "https://discord.com/api/webhooks/1452088104616722475/mIVeSKVD0mtLErmlTt5QqnQvYpDBEw7TpH7CdZB0A0H1Ms5iFWZqZdGmcRY78EpsJ_pI" # Webhook para notificações da gestão (ex: agendamento, início/fim de pausa)
 SUPABASE_URL = "https://gzozqxrlgdzjrqfvdxzw.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6b3pxeHJsZ2R6anJxZnZkeHp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0OTg1MjIsImV4cCI6MjA4MjA3NDUyMn0.dLEjBPESUz5KnVwxqEMaMxoy65gsLqG2QdjK2xFTUhU"
 
@@ -189,6 +189,11 @@ if supabase:
                                     'notificacao_enviada': False # Novo campo
                                 }).execute()
                                 st.success(f"✅ Pausa agendada para {agendamento['nome']} às {agendamento['horario_agendado'].strftime('%H:%M')} por {agendamento['duracao']} minutos.")
+
+                                # --- LINHA ADICIONADA/CORRIGIDA PARA NOTIFICAÇÃO DE AGENDAMENTO NO DISCORD ---
+                                enviar_discord(DISCORD_WEBHOOK_GESTAO, f"🗓️ **{agendamento['nome']}** teve a pausa agendada para **{agendamento['horario_agendado'].strftime('%H:%M')}** por {agendamento['duracao']} minutos.")
+                                # --- FIM DA CORREÇÃO ---
+
                             st.rerun() # Recarrega para atualizar a lista de atendentes pendentes
 
             elif menu == "Histórico":
@@ -221,11 +226,11 @@ if supabase:
                     if lista_del:
                         sel_del = st.selectbox("Selecione quem remover:", lista_del)
                         email_final = sel_del.split('(')[-1].replace(')', '')
-                        cod_del = st.text_input("Código Mestre p/ Deletar:", type="password", key="del_secure")
-                        if st.button("🗑️ EXCLUIR DEFINITIVAMENTE", type="primary"):
+                        cod_del = st.text_input("Código Mestre p/ Deletar:", type="password", key="del_cod")
+                        if st.button("🗑️ REMOVER"):
                             if cod_del == CODIGO_MESTRE_GESTAO:
                                 supabase.table('usuarios').delete().eq('email', email_final).execute()
-                                st.success("✅ Usuário removido.")
+                                st.success("✅ Usuário removido!")
                                 st.rerun()
                             else: st.error("❌ Código incorreto.")
                     else:
@@ -312,7 +317,7 @@ if supabase:
                     st.components.v1.html(f"""
                         <div id="timer" style="font-size: 80px; font-weight: bold; text-align: center; color: #ff4b4b; padding: 20px; border: 4px solid #ff4b4b; border-radius: 15px; font-family: sans-serif;">--:--</div>
                         <script>
-                            var endTime = {st.session_state.fim};
+                            var endTime = {st.session_state.get('fim', 0)}; // Garante que 'fim' tenha um valor padrão
                             var audioContext = new (window.AudioContext || window.webkitAudioContext)();
                             var beepCount = 0;
                             var beepInterval;
