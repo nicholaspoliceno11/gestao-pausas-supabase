@@ -189,8 +189,8 @@ if supabase:
                                 'tipo_pausa': tipo_pausa
                             }).execute()
                             
-                            enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🔔 Supervisor {u_info['nome']} programou **{tipo_pausa}** para {usuarios_db[alvo]['nome']} ({minutos} min) para as {horario_agendado_str}.")
-                            st.success(f"✅ {tipo_pausa} para {usuarios_db[alvo]['nome']} agendada com sucesso!")
+                            enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🔔 Supervisor {u_info['nome']} programou **{tipo_pausa}** de {usuarios_db[alvo]['nome']} ({minutos} min) para as {horario_agendado_str}.")
+                            st.success(f"✅ {tipo_pausa} de {usuarios_db[alvo]['nome']} agendada com sucesso!")
                             time.sleep(1)
                             st.rerun()
                         except Exception as e:
@@ -285,13 +285,48 @@ if supabase:
                     <div id="timer" style="font-size: 80px; font-weight: bold; text-align: center; color: #ff4b4b; padding: 20px; border: 4px solid #ff4b4b; border-radius: 15px;">--:--</div>
                     <script>
                         var endTime = {st.session_state.fim};
+                        var alarmPlayed = false;
+                        
+                        // Função para tocar bip
+                        function playBeep(frequency, duration) {{
+                            var audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                            var oscillator = audioContext.createOscillator();
+                            var gainNode = audioContext.createGain();
+                            
+                            oscillator.connect(gainNode);
+                            gainNode.connect(audioContext.destination);
+                            
+                            oscillator.frequency.value = frequency;
+                            oscillator.type = 'sine';
+                            
+                            gainNode.gain.setValueAtTime(1, audioContext.currentTime);
+                            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+                            
+                            oscillator.start(audioContext.currentTime);
+                            oscillator.stop(audioContext.currentTime + duration);
+                        }}
+                        
+                        // Função para tocar 3 bips
+                        function playAlarm() {{
+                            playBeep(800, 0.3);  // Primeiro bip
+                            setTimeout(() => playBeep(800, 0.3), 400);  // Segundo bip
+                            setTimeout(() => playBeep(800, 0.3), 800);  // Terceiro bip
+                        }}
+                        
                         var x = setInterval(function() {{
                             var diff = endTime - new Date().getTime();
                             if (diff <= 0) {{
-                                clearInterval(x); document.getElementById('timer').innerHTML = "00:00";
-                                alert("🚨 ATENÇÃO! Sua pausa finalizou!");
+                                clearInterval(x);
+                                document.getElementById('timer').innerHTML = "00:00";
+                                
+                                if (!alarmPlayed) {{
+                                    playAlarm();
+                                    alarmPlayed = true;
+                                    alert("🚨 ATENÇÃO! Sua pausa finalizou!");
+                                }}
                             }} else {{
-                                var m = Math.floor(diff / 60000); var s = Math.floor((diff % 60000) / 1000);
+                                var m = Math.floor(diff / 60000);
+                                var s = Math.floor((diff % 60000) / 1000);
                                 document.getElementById('timer').innerHTML = (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
                             }}
                         }}, 1000);
