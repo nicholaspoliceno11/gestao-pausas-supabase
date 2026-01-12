@@ -189,8 +189,8 @@ if supabase:
                                 'tipo_pausa': tipo_pausa
                             }).execute()
                             
-                            enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🔔 Supervisor {u_info['nome']} programou **{tipo_pausa}** de {usuarios_db[alvo]['nome']} ({minutos} min) para as {horario_agendado_str}.")
-                            st.success(f"✅ {tipo_pausa} de {usuarios_db[alvo]['nome']} agendada com sucesso!")
+                            enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🔔 Supervisor {u_info['nome']} programou **{tipo_pausa}** para {usuarios_db[alvo]['nome']} ({minutos} min) para as {horario_agendado_str}.")
+                            st.success(f"✅ {tipo_pausa} para {usuarios_db[alvo]['nome']} agendada com sucesso!")
                             time.sleep(1)
                             st.rerun()
                         except Exception as e:
