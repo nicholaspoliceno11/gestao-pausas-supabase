@@ -1,6 +1,7 @@
 import streamlit as st
 from supabase import create_client, Client
-from datetime import datetime, timedelta, date, time
+from datetime import datetime, timedelta, date
+import time
 import pandas as pd
 import pytz
 import requests
@@ -190,9 +191,11 @@ if supabase:
                             
                             enviar_discord(DISCORD_WEBHOOK_EQUIPE, f"🔔 Supervisor {u_info['nome']} programou **{tipo_pausa}** de {usuarios_db[alvo]['nome']} ({minutos} min) para as {horario_agendado_str}.")
                             st.success(f"✅ {tipo_pausa} de {usuarios_db[alvo]['nome']} agendada com sucesso!")
+                            time.sleep(1)
                             st.rerun()
                         except Exception as e:
-                            st.rerun()
+                            st.error(f"❌ Erro ao agendar: {str(e)}")
+                            st.info("💡 Verifique se a coluna 'tipo_pausa' existe nas tabelas 'escalas' e 'historico' no Supabase.")
 
             elif menu == "Histórico":
                 st.markdown("### 📊 Histórico de Pausas")
