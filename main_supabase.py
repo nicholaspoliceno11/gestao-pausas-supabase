@@ -12,7 +12,7 @@ from email.mime.multipart import MIMEMultipart
 # --- CONFIGURAÇÕES ---
 GMAIL_USER = "gestao.queropassagem@gmail.com"
 GMAIL_PASSWORD = "pakiujauoxbmihyy"
-DISCORD_WEBHOOK_EQUIPE = "https://discord.com/api/webhooks/1452314030357348353/-ty01Mp6tabaM4U9eICtKHJiitsNUoEa9CFs04ivKmvg2FjEBRQ8CSjPJtSD91ZkrvUi"
+DISCORD_WEBHOOK_EQUIPE = "https://discord.com/api/webhooks/1458111767115989005/HbH2dBcht1qREqLSwf7yqxgAgmIFUYPABtLGWHrD8i8xLabHBIfnOLKRs9D-xWh69KBP"
 DISCORD_WEBHOOK_SAC_QP = "https://discord.com/api/webhooks/1453463270517244091/x1KdnNbW8oR-yslJLb5zL5hdLHZXzHLq-I5RwTb67O16d8ccWh69FI63J2i1KJlYmQq4"
 SUPABASE_URL = "https://gzozqxrlgdzjrqfvdxzw.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6b3pxeHJsZ2R6anJxZnZkeHp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0OTg1MjIsImV4cCI6MjA4MjA3NDUyMn0.dLEjBPESUz5KnVwxqEMaMxoy65gsLqG2QdjK2xFTUhU"
@@ -168,7 +168,7 @@ if supabase:
                     st.info("✅ Todos os atendentes SAC já têm uma pausa agendada ou estão em pausa.")
                 else:
                     alvo = st.selectbox("Selecione o Atendente SAC:", at_list_disponiveis)
-                    minutos = st.number_input("Duração (Minutos):", 1, 120, 15)
+                    minutos = st.number_input("Duração (Minutos):", 1, 60, 15)
                     horario_agendado_str = st.text_input("Horário Agendado (HH:MM):", value=get_now().strftime("%H:%M"))
 
                     if st.button("✅ AGENDAR PAUSA", type="primary"):
